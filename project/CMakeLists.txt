@@ -1,12 +1,16 @@
-# ./project CMakeLists.txt
-
 # ADD NEW .cpp FILES HERE
 add_library(Exam_Plugin SHARED
 	"stdafx.cpp"
-	"SurvivalAgentPlugin.cpp"    )
+	"SurvivalAgentPlugin.cpp")
 
 target_link_libraries(Exam_Plugin PUBLIC ${EXAM_LIB_DEBUG})
 target_include_directories(Exam_Plugin PUBLIC ${EXAM_INCLUDE_DIR})
+
+# Explicit debug info generation flags for MSVC
+target_compile_options(Exam_Plugin PRIVATE
+  $<$<CONFIG:Debug>:/Zi>)
+target_link_options(Exam_Plugin PRIVATE
+  $<$<CONFIG:Debug>:/DEBUG>)
 
 set_target_properties(Exam_Plugin PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY_DEBUG  "${CMAKE_SOURCE_DIR}/_DEMO_DEBUG"

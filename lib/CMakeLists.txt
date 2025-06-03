@@ -1,3 +1,6 @@
 # ./lib CMakeLists.txt
 
-set(EXAM_LIB_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/GPP_PluginBase_d.lib" PARENT_SCOPE)
+#set(EXAM_LIB_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/GPP_PluginBase_d.lib" PARENT_SCOPE)
+set(EXAM_LIB_DEBUG 
+    "$<IF:$<CONFIG:Debug>,${CMAKE_CURRENT_SOURCE_DIR}/GPP_PluginBase_d.lib,${CMAKE_CURRENT_SOURCE_DIR}/GPP_PluginBase.lib>" 
+    PARENT_SCOPE)
