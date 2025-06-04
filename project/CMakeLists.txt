@@ -1,7 +1,7 @@
 # ADD NEW .cpp FILES HERE
 add_library(Exam_Plugin SHARED
 	"stdafx.cpp"
-	"SurvivalAgentPlugin.cpp")
+	"SurvivalAgentPlugin.cpp" "SteeringBehaviours.cpp" "SteeringBehaviours.h")
 
 target_link_libraries(Exam_Plugin PUBLIC ${EXAM_LIB_DEBUG})
 target_include_directories(Exam_Plugin PUBLIC ${EXAM_INCLUDE_DIR})

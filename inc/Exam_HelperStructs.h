@@ -153,7 +153,7 @@ struct EntityInfo
 {
 	eEntityType Type;
 	Elite::Vector2 Location;
-
+	 
 	int EntityHash = 0;
 };
 

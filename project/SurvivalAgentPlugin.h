@@ -1,9 +1,15 @@
 #pragma once
 #include "IExamPlugin.h"
 #include "Exam_HelperStructs.h"
+#include "SteeringBehaviours.h"
 
 class IBaseInterface;
 class IExamInterface;
+
+enum class AgentState
+{
+	Explore
+};
 
 class SurvivalAgentPlugin :public IExamPlugin
 {
@@ -34,6 +40,12 @@ private:
 	float m_AngSpeed = 0.f; //Demo purpose
 
 	UINT m_InventorySlot = 0;
+
+	AgentState m_CurrentState = AgentState::Explore; 
+	std::unique_ptr<SteeringBehaviour> m_SteeringBehaviour; 
+
+
+
 };
 
 //ENTRY
