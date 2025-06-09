@@ -7,12 +7,16 @@
 class FiniteStateMachine
 {
 
-	AgentState m_CurrentState = AgentState::Explore; 
+	AgentState m_CurrentState; 
 	IExamInterface* m_pInterface; 
 	std::unique_ptr<StateDecider> m_pStateDecider;
 	std::unique_ptr<Blackboard> m_pBB; 
 	std::unique_ptr<Grid> m_pGrid;
 	std::unique_ptr<SteeringBehaviour> m_pSteeringBehaviour;
+	
+
+	Elite::Vector2 m_Target;
+	bool m_HasEnteredFirstState = false; 
 
 
 	void OnEnter(); 

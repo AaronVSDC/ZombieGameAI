@@ -1,5 +1,6 @@
 #pragma once
 enum class AgentState
 {
-	Explore
+	Explore, 
+	GoToHouse
 };

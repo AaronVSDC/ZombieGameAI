@@ -123,117 +123,117 @@ SteeringPlugin_Output SurvivalAgentPlugin::UpdateSteering(float dt)
 {
 	auto steering = SteeringPlugin_Output();
 
-	m_pFSM->Update(dt); 
-
-	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
-	auto agentInfo = m_pInterface->Agent_GetInfo();
+	return m_pFSM->Update(dt);
 
 
-	//Use the navmesh to calculate the next navmesh point
-	//auto nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(checkpointLocation);
-
-	m_Target = Elite::Vector2(5.f, 0.f); 
-	//OR, Use the mouse target
-	auto nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
-
-	//FOV USAGE DEMO
-	//===============
-
-	//FOV stats = CHEAP! info about the FOV
-	FOVStats stats = m_pInterface->FOV_GetStats();
-
-	
-	
-
-	//FOV data (snapshot of the FOV of the current frame) = EXPENSIVE! returns a new vector for every call
-	auto vHousesInFOV = m_pInterface->GetHousesInFOV();
-	auto vEnemiesInFOV = m_pInterface->GetEnemiesInFOV();
-	auto vItemsInFOV = m_pInterface->GetItemsInFOV();
-	auto vPurgezonesInFOV = m_pInterface->GetPurgeZonesInFOV();
-
-	for (auto& zoneInfo : vPurgezonesInFOV)
-	{
-		std::cout << "Purge Zone in FOV:" << zoneInfo.Center.x << ", "<< zoneInfo.Center.y << "---Radius: "<< zoneInfo.Radius << std::endl;
-	}
-
-	for (auto& enemyInfo : vEnemiesInFOV)
-	{
-		std::cout << "Enemy in FOV:" << enemyInfo.Location.x << ", " << enemyInfo.Location.y << "---Health: " << enemyInfo.Health << std::endl;
-	}
-
-	for (auto& item : vItemsInFOV)
-	{
-		std::cout << "Item in FOV:" << item.Location.x << ", " << item.Location.y << "---Value: " << item.Value << std::endl;	
-	}
-
-	for (auto& house : vHousesInFOV)
-	{
-		std::cout << "House in FOV:" << house.Center.x << ", " << house.Center.y << "---Size: " << house.Size << std::endl;
-	}
-
-	//INVENTORY USAGE DEMO
-	//********************
-
-	if (m_GrabItem)
-	{
-		ItemInfo item;
-		//Item_Grab > When DebugParams.AutoGrabClosestItem is TRUE, the Item_Grab function returns the closest item in range
-		//Keep in mind that DebugParams are only used for debugging purposes, by default this flag is FALSE
-		//Otherwise, use GetEntitiesInFOV() to retrieve a vector of all entities in the FOV (EntityInfo)
-		//Item_Grab gives you the ItemInfo back, based on the passed EntityHash (retrieved by GetEntitiesInFOV)
-		if (m_pInterface->GrabNearestItem(item))
-		{
-			//Once grabbed, you can add it to a specific inventory slot
-			//Slot must be empty
-			m_pInterface->Inventory_AddItem(m_InventorySlot, item);
-		}
-	}
-
-	if (m_UseItem)
-	{
-		//Use an item (make sure there is an item at the given inventory slot)
-		m_pInterface->Inventory_UseItem(m_InventorySlot);
-	}
-
-	if (m_RemoveItem)
-	{
-		//Remove an item from a inventory slot
-		m_pInterface->Inventory_RemoveItem(m_InventorySlot);
-	}
-
-	if (m_DestroyItemsInFOV)
-	{
-		for (auto& item : vItemsInFOV)
-		{
-			m_pInterface->DestroyItem(item);
-		}
-	}
-
-	//Simple Seek Behaviour (towards Target)
+	////Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
+	//auto agentInfo = m_pInterface->Agent_GetInfo();
 
 
-	steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
+	////Use the navmesh to calculate the next navmesh point
+	////auto nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(checkpointLocation);
 
-	//if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
+	//m_Target = Elite::Vector2(5.f, 0.f); 
+	////OR, Use the mouse target
+	//auto nextTargetPos = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
+
+	////FOV USAGE DEMO
+	////===============
+
+	////FOV stats = CHEAP! info about the FOV
+	//FOVStats stats = m_pInterface->FOV_GetStats();
+
+	//
+	//
+
+	////FOV data (snapshot of the FOV of the current frame) = EXPENSIVE! returns a new vector for every call
+	//auto vHousesInFOV = m_pInterface->GetHousesInFOV();
+	//auto vEnemiesInFOV = m_pInterface->GetEnemiesInFOV();
+	//auto vItemsInFOV = m_pInterface->GetItemsInFOV();
+	//auto vPurgezonesInFOV = m_pInterface->GetPurgeZonesInFOV();
+
+	//for (auto& zoneInfo : vPurgezonesInFOV)
 	//{
-	//	steering.LinearVelocity = Elite::ZeroVector2;
+	//	std::cout << "Purge Zone in FOV:" << zoneInfo.Center.x << ", "<< zoneInfo.Center.y << "---Radius: "<< zoneInfo.Radius << std::endl;
 	//}
 
-	//steering.AngularVelocity = m_AngSpeed; //Rotate your character to inspect the world while walking
+	//for (auto& enemyInfo : vEnemiesInFOV)
+	//{
+	//	std::cout << "Enemy in FOV:" << enemyInfo.Location.x << ", " << enemyInfo.Location.y << "---Health: " << enemyInfo.Health << std::endl;
+	//}
 
-	steering.AutoOrient = true; //Setting AutoOrient to true overrides the AngularVelocity
-	steering.RunMode = m_CanRun; //If RunMode is True > MaxLinearSpeed is increased for a limited time (until your stamina runs out)
+	//for (auto& item : vItemsInFOV)
+	//{
+	//	std::cout << "Item in FOV:" << item.Location.x << ", " << item.Location.y << "---Value: " << item.Value << std::endl;	
+	//}
 
-	//SteeringPlugin_Output is works the exact same way a SteeringBehaviour output
+	//for (auto& house : vHousesInFOV)
+	//{
+	//	std::cout << "House in FOV:" << house.Center.x << ", " << house.Center.y << "---Size: " << house.Size << std::endl;
+	//}
 
-	//@End (Demo Purposes)
+	////INVENTORY USAGE DEMO
+	////********************
 
-	m_GrabItem = false; //Reset State
-	m_UseItem = false;
-	m_RemoveItem = false;
-	m_DestroyItemsInFOV = false;
+	//if (m_GrabItem)
+	//{
+	//	ItemInfo item;
+	//	//Item_Grab > When DebugParams.AutoGrabClosestItem is TRUE, the Item_Grab function returns the closest item in range
+	//	//Keep in mind that DebugParams are only used for debugging purposes, by default this flag is FALSE
+	//	//Otherwise, use GetEntitiesInFOV() to retrieve a vector of all entities in the FOV (EntityInfo)
+	//	//Item_Grab gives you the ItemInfo back, based on the passed EntityHash (retrieved by GetEntitiesInFOV)
+	//	if (m_pInterface->GrabNearestItem(item))
+	//	{
+	//		//Once grabbed, you can add it to a specific inventory slot
+	//		//Slot must be empty
+	//		m_pInterface->Inventory_AddItem(m_InventorySlot, item);
+	//	}
+	//}
 
-	return steering;
+	//if (m_UseItem)
+	//{
+	//	//Use an item (make sure there is an item at the given inventory slot)
+	//	m_pInterface->Inventory_UseItem(m_InventorySlot);
+	//}
+
+	//if (m_RemoveItem)
+	//{
+	//	//Remove an item from a inventory slot
+	//	m_pInterface->Inventory_RemoveItem(m_InventorySlot);
+	//}
+
+	//if (m_DestroyItemsInFOV)
+	//{
+	//	for (auto& item : vItemsInFOV)
+	//	{
+	//		m_pInterface->DestroyItem(item);
+	//	}
+	//}
+
+	////Simple Seek Behaviour (towards Target)
+
+
+	//steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
+
+	////if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
+	////{
+	////	steering.LinearVelocity = Elite::ZeroVector2;
+	////}
+
+	////steering.AngularVelocity = m_AngSpeed; //Rotate your character to inspect the world while walking
+
+	//steering.AutoOrient = true; //Setting AutoOrient to true overrides the AngularVelocity
+	//steering.RunMode = m_CanRun; //If RunMode is True > MaxLinearSpeed is increased for a limited time (until your stamina runs out)
+
+	////SteeringPlugin_Output is works the exact same way a SteeringBehaviour output
+
+	////@End (Demo Purposes)
+
+	//m_GrabItem = false; //Reset State
+	//m_UseItem = false;
+	//m_RemoveItem = false;
+	//m_DestroyItemsInFOV = false;
+
 }
 
 //This function should only be used for rendering debug elements

@@ -16,11 +16,13 @@ public:
 
 	void UpdateFOVGrid(); 
 	void DebugDraw(IExamInterface* _interface) const;
+	Elite::Vector2 GetNextFrontierTarget() const;
 
 	//----------------
 	//GETTERS/SETTERS
 	//----------------
 	bool IsInitialized() const { return m_IsInitialized; }
+	float GetCellSize() const { return m_CellSize;  }
 
 
 

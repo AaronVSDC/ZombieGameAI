@@ -18,6 +18,7 @@ void Grid::UpdateFOVGrid()
 				m_Grid[r][c] = 1;  // seen
 		}
 	}
+    DetectFrontiers(); 
 }
 
 
@@ -52,6 +53,17 @@ void Grid::DetectFrontiers()
 			}
 		}
 }
+
+Elite::Vector2 Grid::GetNextFrontierTarget() const
+{
+    if (m_Frontiers.empty())
+        return m_BB->agent.Position;
+    auto it = std::min_element(m_Frontiers.begin(), m_Frontiers.end(), [&](const Elite::Vector2& a, const Elite::Vector2& b) {
+        return Elite::Distance(a, m_BB->agent.Position) < Elite::Distance(b, m_BB->agent.Position);
+        });
+    return *it;
+}
+
 void Grid::DebugDraw(IExamInterface* m_pInterface) const
 {
     // Depths
