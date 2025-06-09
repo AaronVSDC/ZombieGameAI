@@ -6,6 +6,7 @@
 struct Blackboard
 {
 	AgentInfo agent; 
+    WorldInfo worldInfo;
     std::vector<EnemyInfo> enemies;
     std::vector<ItemInfo> items;
     std::vector<HouseInfo>   houses;

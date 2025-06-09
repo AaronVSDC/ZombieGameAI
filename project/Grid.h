@@ -4,28 +4,33 @@
 #include <vector>
 #include <algorithm>
 #include <EliteMath\EVector2.h>
+#include "Blackboard.h"
 
 class Grid
 {
 
 public: 
-	Grid(IExamInterface* _interface);
+	Grid() = default;
+	void InitGrid(const Blackboard* blackboard);
 
 
 	void UpdateFOVGrid(); 
-	void DebugDraw() const;
+	void DebugDraw(IExamInterface* _interface) const;
 	void Refresh();
+
+	//----------------
+	//GETTERS/SETTERS
+	//----------------
+	bool IsInitialized() const { return m_IsInitialized; }
+
 
 
 
 private: 
 	//---------------------------------
-	// INTERFACE AND AGENT/WORLD INFO
+	// BLACKBOARD 
 	//---------------------------------
-	IExamInterface* m_pInterface; 
-	AgentInfo		m_AgentInfo; 
-	WorldInfo		m_WorldInfo; 
-
+	const Blackboard*		m_BB; 
 
 	//---------------------------------
 	// EXPLORATION GRID PARAMETERS
@@ -38,7 +43,11 @@ private:
 	std::vector<Elite::Vector2> m_Frontiers;
 	Elite::Vector2     m_CurrentTarget = { 0,0 };
 
-	void InitGrid(); 
+	//---------------------------------
+	//HELPER MEMBERS/METHODS
+	//---------------------------------
+	bool m_IsInitialized = false; 
+
 	void DetectFrontiers(); 
 
 

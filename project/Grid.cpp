@@ -1,31 +1,18 @@
 #include "stdafx.h"
 #include "Grid.h"
 
-Grid::Grid(IExamInterface* _interface) :m_pInterface(_interface)
-{
-	if (m_pInterface)
-	{
-		Refresh();
-		InitGrid();
-	}
-	else
-	{
-		std::cerr << "Interface is nullptr" << std::endl; 
-	}
-}
-
 void Grid::UpdateFOVGrid()
 {
-	float halfAngle = m_AgentInfo.FOV_Angle * 0.5f;
-	Elite::Vector2 facing{ cosf(m_AgentInfo.Orientation), sinf(m_AgentInfo.Orientation) };
+	float halfAngle = m_BB->agent.FOV_Angle * 0.5f;
+	Elite::Vector2 facing{ cosf(m_BB->agent.Orientation), sinf(m_BB->agent.Orientation) };
 	for (int r = 0; r < m_Rows; ++r)
 	{
 		for (int c = 0; c < m_Cols; ++c)
 		{
 			Elite::Vector2 cellCenter = m_Origin + Elite::Vector2{ c + 0.5f, r + 0.5f } * m_CellSize;
-			Elite::Vector2 toCell = cellCenter - m_AgentInfo.Position;
+			Elite::Vector2 toCell = cellCenter - m_BB->agent.Position;
 			float dist = toCell.Magnitude();
-			if (dist > m_AgentInfo.FOV_Range) continue;
+			if (dist > m_BB->agent.FOV_Range) continue;
 			float ang = acosf(facing.Dot(toCell.GetNormalized()));
 			if (ang <= halfAngle)
 				m_Grid[r][c] = 1;  // seen
@@ -34,20 +21,16 @@ void Grid::UpdateFOVGrid()
 }
 
 
-void Grid::InitGrid()
+void Grid::InitGrid(const Blackboard* blackboard)
 {
-	m_Origin = m_WorldInfo.Center - m_WorldInfo.Dimensions * 0.5f; 
-	m_CellSize = m_AgentInfo.FOV_Range * 0.5; 
-	m_Cols = static_cast<int>(m_WorldInfo.Dimensions.x / m_CellSize) + 1; //+1 is to round up
-	m_Rows = static_cast<int>(m_WorldInfo.Dimensions.y / m_CellSize) + 1; 
+    m_BB = blackboard; 
+	m_Origin = m_BB->worldInfo.Center - m_BB->worldInfo.Dimensions * 0.5f;
+	m_CellSize = m_BB->agent.FOV_Range * 0.5;
+	m_Cols = static_cast<int>(m_BB->worldInfo.Dimensions.x / m_CellSize) + 1; //+1 is to round up
+	m_Rows = static_cast<int>(m_BB->worldInfo.Dimensions.y / m_CellSize) + 1;
 	m_Grid.assign(m_Rows, std::vector<int>(m_Cols, 0)); 
 	
-}
-
-void Grid::Refresh()
-{
-	m_AgentInfo = m_pInterface->Agent_GetInfo(); 
-	m_WorldInfo = m_pInterface->World_GetInfo(); 
+    m_IsInitialized = true; 
 }
 
 void Grid::DetectFrontiers()
@@ -69,7 +52,7 @@ void Grid::DetectFrontiers()
 			}
 		}
 }
-void Grid::DebugDraw() const
+void Grid::DebugDraw(IExamInterface* m_pInterface) const
 {
     // Depths
     const float zDepthFill = 0.9f; 

@@ -8,16 +8,16 @@ class FiniteStateMachine
 {
 
 	AgentState m_CurrentState = AgentState::Explore; 
-	StateDecider m_StateDecider; 
 	IExamInterface* m_pInterface; 
-	Blackboard m_BB; 
+	std::unique_ptr<StateDecider> m_pStateDecider;
+	std::unique_ptr<Blackboard> m_pBB; 
 	std::unique_ptr<Grid> m_pGrid;
 	std::unique_ptr<SteeringBehaviour> m_pSteeringBehaviour;
 
 
 	void OnEnter(); 
 	void OnExit(); 
-	void UpdateExplore(float dt); 
+	SteeringPlugin_Output UpdateExplore(float dt);
 
 
 
@@ -25,7 +25,7 @@ public:
 	FiniteStateMachine(IExamInterface* pInterface);
 	~FiniteStateMachine() = default; 
 
-	void Update(float dt); 
+	SteeringPlugin_Output Update(float dt);
 
 	void DebugRender()const;
 

@@ -10,7 +10,7 @@ public:
 	StateDecider() = default; 
 	~StateDecider() = default; 
 
-	AgentState Decide(AgentState current, const Blackboard& bb); 
+	AgentState Decide(AgentState current, const Blackboard* bb); 
 
 
 
