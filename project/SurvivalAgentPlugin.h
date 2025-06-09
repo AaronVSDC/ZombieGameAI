@@ -1,8 +1,7 @@
 #pragma once
 #include "IExamPlugin.h"
 #include "Exam_HelperStructs.h"
-#include "SteeringBehaviours.h"
-#include "Grid.h"
+#include "FiniteStateMachine.h"
 
 class IBaseInterface;
 class IExamInterface;
@@ -38,10 +37,7 @@ private:
 
 	UINT m_InventorySlot = 0;
 
-
-	std::unique_ptr<Grid> m_pGrid;
-	std::unique_ptr<SteeringBehaviour> m_pSteeringBehaviour; 
-
+	std::unique_ptr<FiniteStateMachine> m_pFSM; 
 
 
 };

@@ -7,25 +7,23 @@ using namespace std;
 //Called only once, during initialization
 void SurvivalAgentPlugin::Initialize(IBaseInterface* pInterface, PluginInfo& info)
 {
-	//Retrieving the interface
-	//This interface gives you access to certain actions the AI_Framework can perform for you
 	m_pInterface = static_cast<IExamInterface*>(pInterface);
-	m_pGrid = make_unique<Grid>(m_pInterface);
 
-
-	//Information for the leaderboards!
 	info.BotName = "mrHeylen";
-	info.Student_Name = "Aaron_Van_Sichem_De_Combe"; //No special characters allowed. Highscores won't work with special characters.
+	info.Student_Name = "Aaron_Van_Sichem_De_Combe"; 
 	info.Student_Class = "2DAE19";
-	info.LB_Password = "WalterWhite";	//Don't use a real password! This is only to prevent other students from overwriting your highscore!
+	info.LB_Password = "WalterWhite";
+
+	//--------
+	//INIT
+	//--------
+	m_pFSM = make_unique<FiniteStateMachine>(m_pInterface);
 }
 
 //Called only once
 void SurvivalAgentPlugin::DllInit()
 {
 	//Called when the plugin is loaded
-	m_pSteeringBehaviour = make_unique<SteeringBehaviour>(); 
-
 }
 
 //Called only once
@@ -124,8 +122,9 @@ void SurvivalAgentPlugin::Update_Debug(float dt)
 SteeringPlugin_Output SurvivalAgentPlugin::UpdateSteering(float dt)
 {
 	auto steering = SteeringPlugin_Output();
-	m_pGrid->UpdateFOVGrid();
-	m_pGrid->Refresh();
+
+	m_pFSM->Update(dt); 
+
 	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
 	auto agentInfo = m_pInterface->Agent_GetInfo();
 
@@ -211,7 +210,8 @@ SteeringPlugin_Output SurvivalAgentPlugin::UpdateSteering(float dt)
 	}
 
 	//Simple Seek Behaviour (towards Target)
-	steering.LinearVelocity = m_pSteeringBehaviour->Wander(agentInfo); 
+
+
 	steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
 
 	//if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
@@ -242,7 +242,7 @@ void SurvivalAgentPlugin::Render(float dt) const
 	//This Render function should only contain calls to Interface->Draw_... functions
 	m_pInterface->Draw_SolidCircle(m_Target, .7f, { 0,0 }, { 1, 0, 0 });
 
-	m_pGrid->DebugDraw(); 
+	m_pFSM->DebugRender(); 
 }
 
 

@@ -120,7 +120,7 @@ void Grid::DebugDraw() const
 
     for (int r = 0; r <= m_Rows; ++r)
     {
-        Elite::Vector2 p1{ m_Origin.x,                      m_Origin.y + r * m_CellSize };
+        Elite::Vector2 p1{ m_Origin.x, m_Origin.y + r * m_CellSize };
         Elite::Vector2 p2{ m_Origin.x + m_Cols * m_CellSize, m_Origin.y + r * m_CellSize };
         m_pInterface->Draw_Segment(p1, p2, lineCol, zDepthLine);
     }
