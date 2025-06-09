@@ -42,15 +42,12 @@ Elite::Vector2 SteeringBehaviour::Evade(const AgentInfo& agentInfo, const Elite:
 
 Elite::Vector2 SteeringBehaviour::Wander(const AgentInfo& agentInfo)
 {
-    // pick a random displacement in [-jitter, +jitter] on x & y
     Elite::Vector2 randomDisp = { Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f,
                                 Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f };
     m_WanderTarget += randomDisp;
     m_WanderTarget.Normalize();
     m_WanderTarget *= m_WanderRadius;
 
-    // Step 2: project target onto world ahead of agent
-    // Agent’s forward vector = (cos?, sin?) if orientation ?
     Elite::Vector2 forward = { cosf(agentInfo.Orientation), sinf(agentInfo.Orientation) };
     Elite::Vector2 circleCenter = agentInfo.Position + forward * m_WanderOffset;
     Elite::Vector2 worldTarget = circleCenter + m_WanderTarget;

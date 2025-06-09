@@ -2,14 +2,11 @@
 #include "IExamPlugin.h"
 #include "Exam_HelperStructs.h"
 #include "SteeringBehaviours.h"
+#include "Grid.h"
 
 class IBaseInterface;
 class IExamInterface;
 
-enum class AgentState
-{
-	Explore
-};
 
 class SurvivalAgentPlugin :public IExamPlugin
 {
@@ -41,8 +38,9 @@ private:
 
 	UINT m_InventorySlot = 0;
 
-	AgentState m_CurrentState = AgentState::Explore; 
-	std::unique_ptr<SteeringBehaviour> m_SteeringBehaviour; 
+
+	std::unique_ptr<Grid> m_pGrid;
+	std::unique_ptr<SteeringBehaviour> m_pSteeringBehaviour; 
 
 
 

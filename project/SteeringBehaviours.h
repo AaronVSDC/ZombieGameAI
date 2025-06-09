@@ -2,7 +2,7 @@
 #include <Exam_HelperStructs.h>
 
 
-class SteeringBehaviour
+class SteeringBehaviour final
 {
 	//WANDER DATA
 	float m_WanderOffset = 5.f; 

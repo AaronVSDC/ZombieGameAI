@@ -10,6 +10,8 @@ void SurvivalAgentPlugin::Initialize(IBaseInterface* pInterface, PluginInfo& inf
 	//Retrieving the interface
 	//This interface gives you access to certain actions the AI_Framework can perform for you
 	m_pInterface = static_cast<IExamInterface*>(pInterface);
+	m_pGrid = make_unique<Grid>(m_pInterface);
+
 
 	//Information for the leaderboards!
 	info.BotName = "mrHeylen";
@@ -22,7 +24,8 @@ void SurvivalAgentPlugin::Initialize(IBaseInterface* pInterface, PluginInfo& inf
 void SurvivalAgentPlugin::DllInit()
 {
 	//Called when the plugin is loaded
-	m_SteeringBehaviour = make_unique<SteeringBehaviour>(); 
+	m_pSteeringBehaviour = make_unique<SteeringBehaviour>(); 
+
 }
 
 //Called only once
@@ -52,6 +55,8 @@ void SurvivalAgentPlugin::InitGameDebugParams(GameDebugParams& params)
 
 void SurvivalAgentPlugin::Update_Debug(float dt)
 {
+
+
 	////Demo Event Code
 	////In the end your Agent should be able to walk around without external input
 	//if (m_pInterface->Input_IsMouseButtonUp(Elite::InputMouseButton::eLeft))
@@ -119,7 +124,8 @@ void SurvivalAgentPlugin::Update_Debug(float dt)
 SteeringPlugin_Output SurvivalAgentPlugin::UpdateSteering(float dt)
 {
 	auto steering = SteeringPlugin_Output();
-
+	m_pGrid->UpdateFOVGrid();
+	m_pGrid->Refresh();
 	//Use the Interface (IAssignmentInterface) to 'interface' with the AI_Framework
 	auto agentInfo = m_pInterface->Agent_GetInfo();
 
@@ -205,7 +211,7 @@ SteeringPlugin_Output SurvivalAgentPlugin::UpdateSteering(float dt)
 	}
 
 	//Simple Seek Behaviour (towards Target)
-	steering.LinearVelocity = m_SteeringBehaviour->Wander(agentInfo); 
+	steering.LinearVelocity = m_pSteeringBehaviour->Wander(agentInfo); 
 	steering.LinearVelocity *= agentInfo.MaxLinearSpeed; //Rescale to Max Speed
 
 	//if (Distance(nextTargetPos, agentInfo.Position) < 2.f)
@@ -235,6 +241,8 @@ void SurvivalAgentPlugin::Render(float dt) const
 {
 	//This Render function should only contain calls to Interface->Draw_... functions
 	m_pInterface->Draw_SolidCircle(m_Target, .7f, { 0,0 }, { 1, 0, 0 });
+
+	m_pGrid->DebugDraw(); 
 }
 
 
