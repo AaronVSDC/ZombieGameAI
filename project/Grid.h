@@ -16,7 +16,6 @@ public:
 
 	void UpdateFOVGrid(); 
 	void DebugDraw(IExamInterface* _interface) const;
-	void Refresh();
 
 	//----------------
 	//GETTERS/SETTERS
