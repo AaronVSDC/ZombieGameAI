@@ -21,9 +21,25 @@ SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 	m_pBB->items = m_pInterface->GetItemsInFOV();
 	m_pBB->houses = m_pInterface->GetHousesInFOV();
 	m_pBB->worldInfo = m_pInterface->World_GetInfo(); //Todo: test if can be moved to constructor
+	for (auto const& h : m_pBB->houses)
+	{
+		bool seen = false;
+		for (auto const& known : m_pBB->knownHouseCenters)
+			if ((known - h.Center).MagnitudeSquared() < 0.01f)
+			{
+				seen = true;
+				break;
+			}
+		if (!seen)
+			m_pBB->knownHouseCenters.push_back(h.Center);
+	}
 
+	//---------------------------
+	//INITIALIZE AND UPDATE GRID
+	//---------------------------
 	if (!m_pGrid->IsInitialized()) m_pGrid->InitGrid(m_pBB.get());
 	if (!m_HasEnteredFirstState) OnEnter(), m_HasEnteredFirstState = true;
+	m_pGrid->UpdateFOVGrid();
 
 
 	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get());
@@ -32,14 +48,24 @@ SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 
 	switch (m_CurrentState)
 	{
-	case AgentState::Explore: return UpdateExplore(dt); break;
-	case AgentState::GoToHouse: return UpdateGoToHouse(dt); break;
+	case AgentState::Explore:
+	{
+		return UpdateExplore(dt);
+		break;
+	}
+	case AgentState::GoToHouse:
+	{
+		return UpdateGoToHouse(dt);
+		break;
+	}
 	}
 
 }
 void FiniteStateMachine::DebugRender() const
 {
 	m_pGrid->DebugDraw(m_pInterface);
+	m_pInterface->Draw_SolidCircle(m_Target, 1.f, {}, { 1, 0, 0 });
+
 }
 void FiniteStateMachine::OnEnter()
 {
@@ -47,12 +73,16 @@ void FiniteStateMachine::OnEnter()
 	{
 	case AgentState::Explore:
 	{
+		std::cout << "Explore" << std::endl;
+
 		m_pGrid->UpdateFOVGrid();
 		m_Target = m_pGrid->GetNextFrontierTarget();
 		break;
 	}
 	case AgentState::GoToHouse:
 	{
+		std::cout << "GoToHouse" << std::endl;
+
 		const auto& houses = m_pBB->houses;
 		auto& agentPos = m_pBB->agent.Position;
 
@@ -70,8 +100,6 @@ void FiniteStateMachine::OnEnter()
 			}
 		}
 		m_Target = bestHouse;
-
-		
 		break;
 	}
 	}
@@ -86,7 +114,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-	m_pGrid->UpdateFOVGrid();
 
 	const float arriveDist = m_pGrid->GetCellSize() * 0.5f;
 	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveDist)
@@ -112,25 +139,50 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 #pragma region GO_TO_HOUSE
 SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 {
-	SteeringPlugin_Output steering{  };
-	if (m_pBB->houses.empty())
-	{
-		steering.AutoOrient = true;
-		return steering;
-	}
+	SteeringPlugin_Output steering{};
+	const auto agentInfo = m_pInterface->Agent_GetInfo();
 
-	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
-	Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
-	steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+	const Elite::Vector2 currentWaypoint =
+		m_pInterface->NavMesh_GetClosestPathPoint(m_pBB->currentHouseTarget);
+
+	constexpr float waypointArriveRadius = 1.5f;
+	const float distToWP2 = (currentWaypoint - agentInfo.Position).MagnitudeSquared();
+	if (distToWP2 < waypointArriveRadius * waypointArriveRadius)
+	{
+		steering.LinearVelocity = Elite::ZeroVector2;
+	}
+	else
+	{
+		Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
+		steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
+	}
 	steering.AutoOrient = true;
 
-	constexpr float arriveRadius = .5f;
-	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveRadius)
+	constexpr float houseArriveDistance = 0.5f;
+	if (Elite::Distance(agentInfo.Position, m_pBB->currentHouseTarget) < houseArriveDistance)
 	{
 		m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
 		m_pBB->hasHouseTarget = false;
 	}
-
 	return steering;
+}
+#pragma endregion
+#pragma region ATTACK
+SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
+{
+	return SteeringPlugin_Output();
+}
+#pragma endregion
+
+#pragma region EVADE_ENEMY
+SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
+{
+	return SteeringPlugin_Output();
+}
+#pragma endregion 
+#pragma region PICKUP_LOOT
+SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
+{
+	return SteeringPlugin_Output();
 }
 #pragma endregion

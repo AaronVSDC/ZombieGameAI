@@ -2,5 +2,8 @@
 enum class AgentState
 {
 	Explore, 
-	GoToHouse
+	GoToHouse, 
+	EvadeEnemy, 
+	Attack, 
+	PickupLoot
 };

@@ -28,7 +28,9 @@ class FiniteStateMachine
 	//----------------
 	SteeringPlugin_Output UpdateExplore(float dt);
 	SteeringPlugin_Output UpdateGoToHouse(float dt); 
-
+	SteeringPlugin_Output UpdateAttack(float dt); 
+	SteeringPlugin_Output UpdateEvadeEnemy(float dt); 
+	SteeringPlugin_Output PickupLoot(float dt); 
 
 
 public: 
