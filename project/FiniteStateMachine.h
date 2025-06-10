@@ -21,7 +21,13 @@ class FiniteStateMachine
 
 	void OnEnter(); 
 	void OnExit(); 
+
+
+	//----------------
+	//STATE UPDATES
+	//----------------
 	SteeringPlugin_Output UpdateExplore(float dt);
+	SteeringPlugin_Output UpdateGoToHouse(float dt); 
 
 
 

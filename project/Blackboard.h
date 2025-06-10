@@ -10,4 +10,7 @@ struct Blackboard
     std::vector<EnemyInfo> enemies;
     std::vector<ItemInfo> items;
     std::vector<HouseInfo>   houses;
+    std::vector<Elite::Vector2>  visitedHouseCenters;
+    bool                 hasHouseTarget = false;
+    Elite::Vector2       currentHouseTarget{};
 };
