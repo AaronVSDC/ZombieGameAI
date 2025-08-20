@@ -3,16 +3,24 @@
 
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
-    
+    // Keep track of time since last direct enemy interaction
+    m_TotalTime += dt;
+
     //ENEMY HANDLING HAS PRIORITY
-    if (!bb->enemies.empty())
+    if (!bb->enemies.empty() || bb->tookDamage)
     {
+        // reset timer whenever a threat is detected
+        m_TotalTime = 0.f;
+
         if (bb->hasWeapon)
             return AgentState::Attack;
 
-            return AgentState::EvadeEnemy;
-   
+        return AgentState::EvadeEnemy;
     }
+
+    // Continue evading for a short period after losing sight of the enemy
+    if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration && bb->lastEnemyValid)
+        return AgentState::EvadeEnemy;
 
     //ITEM HANDLING WHEN THERE IS FREE SPACE
     bool hasNonGarbage = std::any_of(bb->items.begin(), bb->items.end(),

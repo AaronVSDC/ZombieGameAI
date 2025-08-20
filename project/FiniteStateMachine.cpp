@@ -148,10 +148,8 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 {
 	SteeringPlugin_Output steering{};
-	if (m_pBB->enemies.empty())
-		return steering;
 
-	//FIND CLOSEST ENEMY
+	// Try to find the closest enemy in FOV
 	const EnemyInfo* closest = nullptr;
 	float bestDist = FLT_MAX;
 	for (auto const& e : m_pBB->enemies)
@@ -159,13 +157,24 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
 		if (d < bestDist)
 		{
-			bestDist = d; 
+			bestDist = d;
 			closest = &e;
 		}
 	}
 
+	// If none in FOV, fall back to the last known enemy position
+	if (!closest && m_pBB->lastEnemyValid)
+	{
+		closest = &m_pBB->lastEnemy;
+		bestDist = (closest->Location - m_pBB->agent.Position).MagnitudeSquared();
+	}
+
 	if (closest)
 	{
+		// Remember this enemy so we can keep tracking when it leaves the FOV
+		m_pBB->lastEnemy = *closest;
+		m_pBB->lastEnemyValid = true;
+		 
 		//IF CLOSE ENOUGH, STOP AND SHOOT
 		const float attackRange = m_pBB->agent.GrabRange * 2.f;
 		if (bestDist < attackRange * attackRange)
@@ -192,7 +201,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-	//FLEE FROM CLOSEST ENEMY
+	//FLEE FROM CLOSEST ENEMY (OR LAST KNOWN ENEMY WHEN NOT IN FOV)
 	const EnemyInfo* closest = nullptr;
 	float bestDist = FLT_MAX;
 	for (auto const& e : m_pBB->enemies)
@@ -207,10 +216,21 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 	if (closest)
 	{
+		// Remember enemy in case it leaves the FOV next frame 
+		m_pBB->lastEnemy = *closest;
+		m_pBB->lastEnemyValid = true;
+	}
+	else if (m_pBB->lastEnemyValid)
+	{
+		closest = &m_pBB->lastEnemy;
+	}
+
+	if (closest)
+	{
 		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Evade(m_pBB->agent, closest->Location, closest->LinearVelocity);
 		steering.LinearVelocity = fleeDir * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
-		steering.RunMode = true; 
+		steering.RunMode = true;
 	}
 	return steering;
 }
@@ -271,11 +291,44 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 void FiniteStateMachine::PopulateBlackboard()
 {
 	m_pBB->agent = m_pInterface->Agent_GetInfo();
+
+	// Track health changes so we can react when hit from outside the FOV
+	m_pBB->tookDamage = (m_pBB->agent.Health < m_pBB->lastHealth);
+	m_pBB->lastHealth = m_pBB->agent.Health;
+
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
 	m_pBB->items = m_pInterface->GetItemsInFOV();
 	m_pBB->houses = m_pInterface->GetHousesInFOV();
 	m_pBB->worldInfo = m_pInterface->World_GetInfo();
 
+	// Remember last seen enemy or estimate a position behind the agent if damaged
+	if (!m_pBB->enemies.empty())
+	{
+		const EnemyInfo* closest = nullptr;
+		float bestDist = FLT_MAX;
+		for (auto const& e : m_pBB->enemies)
+		{
+			float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
+			if (d < bestDist)
+			{
+				bestDist = d;
+				closest = &e;
+			}
+		}
+		if (closest)
+		{
+			m_pBB->lastEnemy = *closest;
+			m_pBB->lastEnemyValid = true;
+		}
+	}
+	else if (m_pBB->tookDamage)
+	{
+		float angle = m_pBB->agent.Orientation;
+		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
+		m_pBB->lastEnemy.Location = m_pBB->agent.Position - forward;
+		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
+		m_pBB->lastEnemyValid = true;
+	}
 	m_pBB->hasWeapon = false;
 	m_pBB->weaponSlot = -1;
 	m_pBB->freeSlot = -1;
