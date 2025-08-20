@@ -58,9 +58,32 @@ Elite::Vector2 Grid::GetNextFrontierTarget() const
 {
     if (m_Frontiers.empty())
         return m_BB->agent.Position;
-    auto it = std::min_element(m_Frontiers.begin(), m_Frontiers.end(), [&](const Elite::Vector2& a, const Elite::Vector2& b) {
-        return Elite::Distance(a, m_BB->agent.Position) < Elite::Distance(b, m_BB->agent.Position);
+
+    Elite::Vector2 facing{ cosf(m_BB->agent.Orientation), sinf(m_BB->agent.Orientation) };
+
+    // Weight that controls how much the angle with the current direction
+    // influences the selection. Higher values bias the selection to targets
+    // that deviate from the current heading.
+    constexpr float angleWeight = 2.f;
+
+    auto it = std::min_element(m_Frontiers.begin(), m_Frontiers.end(),
+        [&](const Elite::Vector2& a, const Elite::Vector2& b)
+        {
+            auto score = [&](const Elite::Vector2& target)
+                {
+                    float distance = Elite::Distance(target, m_BB->agent.Position);
+
+                    Elite::Vector2 dir = (target - m_BB->agent.Position).GetNormalized();
+                    float dot = facing.Dot(dir);
+                    dot = max(-1.f, min(1.f, dot)); 
+                    float angle = acosf(dot);
+
+                    return distance + angleWeight * angle;
+                };
+
+            return score(a) < score(b);
         });
+
     return *it;
 }
 
