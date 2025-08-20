@@ -16,8 +16,10 @@ class FiniteStateMachine
 	
 
 	Elite::Vector2 m_Target;
-	bool m_HasEnteredFirstState = false; 
+	bool m_HasEnteredFirstState = false;
 
+	float m_FrontierWanderTimer = 0.f;
+	const float m_FrontierWanderDuration = 5.f;
 
 	void OnEnter(); 
 	void OnExit(); 

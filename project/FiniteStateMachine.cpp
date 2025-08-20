@@ -33,8 +33,9 @@ void FiniteStateMachine::OnEnter()
 	{
 		std::cout << "Explore" << std::endl;
 
-		m_pGrid->UpdateFOVGrid();
+		m_pGrid->UpdateFOVGrid(); 
 		m_Target = m_pGrid->GetNextFrontierTarget();
+		m_FrontierWanderTimer = 0.f;
 		break;
 	}
 	case AgentState::GoToHouse:
@@ -87,22 +88,25 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-
 	const float arriveDist = m_pGrid->GetCellSize() * 0.5f;
 	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveDist)
 	{
-		m_Target = m_pGrid->GetNextFrontierTarget();
+		if (m_FrontierWanderTimer <= 0.f)
+			m_FrontierWanderTimer = m_FrontierWanderDuration;
 	}
 
-	////if no frontiers -> wander
-	//if ((m_Target - m_pBB->agent.Position).MagnitudeSquared() < 1e-4f)
-	//{
-	//	steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent);
-	//	return steering;
-	//}
+	if (m_FrontierWanderTimer > 0.f)
+	{
+		m_FrontierWanderTimer -= dt;
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent);
+		steering.AutoOrient = true;
+		if (m_FrontierWanderTimer <= 0.f)
+			m_Target = m_pGrid->GetNextFrontierTarget();
+		return steering;
+	} 
 
-	Elite::Vector2  navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
-	Elite::Vector2  desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
+	Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 	steering.AutoOrient = true;
 	steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 
