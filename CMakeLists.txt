@@ -14,10 +14,10 @@ if (MSVC)
 else()
 	set(CMAKE_CXX_FLAGS_DEBUG "-g")
 	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-endif()
+endif() 
 
 add_subdirectory(inc)
-add_subdirectory(lib)
+add_subdirectory(lib) 
 add_subdirectory(project)
 
 message("Source file exe: ${EXAM_LIB_DEBUG}")

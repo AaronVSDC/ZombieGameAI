@@ -20,8 +20,8 @@ SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
 	m_pBB->items = m_pInterface->GetItemsInFOV();
 	m_pBB->houses = m_pInterface->GetHousesInFOV();
-	m_pBB->worldInfo = m_pInterface->World_GetInfo(); //Todo: test if can be moved to constructor
-	for (auto const& h : m_pBB->houses)
+	m_pBB->worldInfo = m_pInterface->World_GetInfo();  
+	for (auto const& h : m_pBB->houses) 
 	{
 		bool seen = false;
 		for (auto const& known : m_pBB->knownHouseCenters)
