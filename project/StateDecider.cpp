@@ -13,7 +13,9 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb)
     }
 
     //ITEM HANDLING WHEN THERE IS FREE SPACE
-    if (!bb->items.empty() && bb->freeSlot >= 0)
+    bool hasNonGarbage = std::any_of(bb->items.begin(), bb->items.end(),
+        [](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
+    if (hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;
 
     //CONTINUE GOING TO HOUSE TARGET IF IS SET

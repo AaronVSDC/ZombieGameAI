@@ -131,7 +131,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	}
 	steering.AutoOrient = true;
 
-	constexpr float houseArriveDistance = 0.5f;
+	constexpr float houseArriveDistance = 1.f;
 	if (Elite::Distance(agentInfo.Position, m_pBB->currentHouseTarget) < houseArriveDistance)
 	{
 		m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
