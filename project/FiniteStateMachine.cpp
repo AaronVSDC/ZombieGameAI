@@ -268,21 +268,27 @@ void FiniteStateMachine::PopulateBlackboard()
 	m_pBB->weaponSlot = -1;
 	m_pBB->freeSlot = -1;
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
+	if (m_pBB->inventory.empty())
+		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
+
+	m_pBB->hasWeapon = false;
+	m_pBB->weaponSlot = -1;
+	m_pBB->freeSlot = -1;
 	for (int i = 0; i < invCap; ++i)
 	{
-		ItemInfo item{};
-		if (m_pInterface->Inventory_GetItem(i, item))
+		const eItemType type = m_pBB->inventory[i];
+		if (type == eItemType::GARBAGE)
 		{
-			if (item.Type == eItemType::PISTOL || item.Type == eItemType::SHOTGUN)
+			if (m_pBB->freeSlot == -1)
+				m_pBB->freeSlot = i;
+		}
+		else
+		{
+			if ((type == eItemType::PISTOL || type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
 			{
 				m_pBB->hasWeapon = true;
-				if (m_pBB->weaponSlot == -1)
-					m_pBB->weaponSlot = i;
+				m_pBB->weaponSlot = i;
 			}
-		}
-		else if (m_pBB->freeSlot == -1)
-		{
-			m_pBB->freeSlot = i;
 		}
 	}
 	for (auto const& h : m_pBB->houses)
