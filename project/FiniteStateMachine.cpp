@@ -234,14 +234,23 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 		}
 	}
 
-	if (!closest) 
-		return steering;
+	if (!closest)
+		return steering; 
 
 	if (bestDist < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
 	{
 		ItemInfo item = *closest;
 		if (m_pInterface->GrabItem(item))
-			m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item);
+		{
+			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
+			{
+				//Track added item so we do not try to use the same slot again
+				if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
+				{
+					m_pBB->inventory[m_pBB->freeSlot] = item.Type;
+				}
+			}
+		}
 	}
 	else
 	{
@@ -268,27 +277,25 @@ void FiniteStateMachine::PopulateBlackboard()
 	m_pBB->weaponSlot = -1;
 	m_pBB->freeSlot = -1;
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
-	if (m_pBB->inventory.empty())
-		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
 
-	m_pBB->hasWeapon = false;
-	m_pBB->weaponSlot = -1;
-	m_pBB->freeSlot = -1;
+	//Ensure local inventory cache matches the actual agent inventory
+	m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
 	for (int i = 0; i < invCap; ++i)
 	{
-		const eItemType type = m_pBB->inventory[i];
-		if (type == eItemType::GARBAGE)
+		ItemInfo invItem{};
+		if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
 		{
-			if (m_pBB->freeSlot == -1)
-				m_pBB->freeSlot = i;
-		}
-		else
-		{
-			if ((type == eItemType::PISTOL || type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
+			m_pBB->inventory[i] = invItem.Type;
+
+			if ((invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
 			{
 				m_pBB->hasWeapon = true;
-				m_pBB->weaponSlot = i;
+				m_pBB->weaponSlot = i; 
 			}
+		}
+		else if (m_pBB->freeSlot == -1)
+		{
+			m_pBB->freeSlot = i;
 		}
 	}
 	for (auto const& h : m_pBB->houses)
