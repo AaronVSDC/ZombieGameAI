@@ -12,7 +12,7 @@ public:
 
 	AgentState Decide(AgentState current, Blackboard* bb, float dt); 
 
-	float m_EvadeDuration = 2.f;
+	float m_EvadeDuration = 4.f;
 	float m_TotalTime = 0.f; 
 	
 

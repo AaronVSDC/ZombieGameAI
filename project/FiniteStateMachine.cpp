@@ -135,7 +135,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	}
 	steering.AutoOrient = true;
 
-	constexpr float houseArriveDistance = 1.f;
+	constexpr float houseArriveDistance = 3.f;
 	if (Elite::Distance(agentInfo.Position, m_pBB->currentHouseTarget) < houseArriveDistance)
 	{
 		m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
@@ -144,6 +144,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	return steering;
 }
 #pragma endregion
+
 #pragma region ATTACK
 SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 {
@@ -174,15 +175,43 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		// Remember this enemy so we can keep tracking when it leaves the FOV
 		m_pBB->lastEnemy = *closest;
 		m_pBB->lastEnemyValid = true;
-		 
-		//IF CLOSE ENOUGH, STOP AND SHOOT
-		const float attackRange = m_pBB->agent.GrabRange * 2.f;
-		if (bestDist < attackRange * attackRange)
+
+		// Calculate orientation to enemy
+		Elite::Vector2 toEnemy = closest->Location - m_pBB->agent.Position;
+		float desiredOrientation = atan2f(toEnemy.y, toEnemy.x);
+		float orientationDiff = atan2f(sinf(desiredOrientation - m_pBB->agent.Orientation),
+			cosf(desiredOrientation - m_pBB->agent.Orientation));
+		float dist = sqrtf(bestDist);
+
+		// Check if enemy is within the current FOV
+		bool enemyInFOV = (dist < m_pBB->agent.FOV_Range) &&
+			(fabsf(orientationDiff) < m_pBB->agent.FOV_Angle * 0.5f);
+
+		// If not in FOV, rotate in place until we see the enemy
+		if (!enemyInFOV)
 		{
 			steering.LinearVelocity = Elite::ZeroVector2;
-			steering.AutoOrient = true;
-			if (m_pBB->weaponSlot >= 0)
-				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
+			steering.AutoOrient = false;
+			steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
+			return steering;
+		}
+
+		// When in sight, decide to shoot or approach
+		const float attackRange = m_pBB->agent.GrabRange * 2.f;
+		if (dist < attackRange)
+		{
+			steering.LinearVelocity = Elite::ZeroVector2;
+			steering.AutoOrient = false;
+			if (fabsf(orientationDiff) > 0.05f)
+			{
+				steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
+			} 
+			else
+			{
+				steering.AngularVelocity = 0.f;
+				if (m_pBB->weaponSlot >= 0)
+					m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
+			}
 		}
 		else
 		{
@@ -234,7 +263,8 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 	}
 	return steering;
 }
-#pragma endregion 
+#pragma endregion
+
 #pragma region PICKUP_LOOT
 SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 {
@@ -285,7 +315,6 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 	return steering;
 }
 #pragma endregion
-
 
 #pragma region HELPER
 void FiniteStateMachine::PopulateBlackboard()
