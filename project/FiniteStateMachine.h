@@ -40,6 +40,9 @@ public:
 	SteeringPlugin_Output Update(float dt);
 
 	void DebugRender()const;
+	void PopulateBlackboard();
+	void InitAndUpdateGrid(); 
+	SteeringPlugin_Output UpdateStates(float dt);
 
 
 

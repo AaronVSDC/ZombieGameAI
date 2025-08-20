@@ -13,52 +13,9 @@ FiniteStateMachine::FiniteStateMachine(IExamInterface* pInterface) :
 
 SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 {
-	//--------------------
-	//POPULATE BLACKBOARD
-	//--------------------
-	m_pBB->agent = m_pInterface->Agent_GetInfo();
-	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
-	m_pBB->items = m_pInterface->GetItemsInFOV();
-	m_pBB->houses = m_pInterface->GetHousesInFOV();
-	m_pBB->worldInfo = m_pInterface->World_GetInfo();  
-	for (auto const& h : m_pBB->houses) 
-	{
-		bool seen = false;
-		for (auto const& known : m_pBB->knownHouseCenters)
-			if ((known - h.Center).MagnitudeSquared() < 0.01f)
-			{
-				seen = true;
-				break;
-			}
-		if (!seen)
-			m_pBB->knownHouseCenters.push_back(h.Center);
-	}
-
-	//---------------------------
-	//INITIALIZE AND UPDATE GRID
-	//---------------------------
-	if (!m_pGrid->IsInitialized()) m_pGrid->InitGrid(m_pBB.get());
-	if (!m_HasEnteredFirstState) OnEnter(), m_HasEnteredFirstState = true;
-	m_pGrid->UpdateFOVGrid();
-
-
-	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get());
-	if (next != m_CurrentState)
-		OnExit(), m_CurrentState = next, OnEnter();
-
-	switch (m_CurrentState)
-	{
-	case AgentState::Explore:
-	{
-		return UpdateExplore(dt);
-		break;
-	}
-	case AgentState::GoToHouse:
-	{
-		return UpdateGoToHouse(dt);
-		break;
-	}
-	}
+	PopulateBlackboard();
+	InitAndUpdateGrid();
+	return UpdateStates(dt);
 
 }
 void FiniteStateMachine::DebugRender() const
@@ -67,6 +24,7 @@ void FiniteStateMachine::DebugRender() const
 	m_pInterface->Draw_SolidCircle(m_Target, 1.f, {}, { 1, 0, 0 });
 
 }
+
 void FiniteStateMachine::OnEnter()
 {
 	switch (m_CurrentState)
@@ -91,7 +49,7 @@ void FiniteStateMachine::OnEnter()
 
 		for (auto const& h : houses)
 		{
-			
+
 			float d = (h.Center - agentPos).MagnitudeSquared();
 			if (d < bestDistSqr)
 			{
@@ -100,6 +58,21 @@ void FiniteStateMachine::OnEnter()
 			}
 		}
 		m_Target = bestHouse;
+		break;
+	}
+	case AgentState::Attack:
+	{
+		std::cout << "Attack" << std::endl;
+		break;
+	}
+	case AgentState::EvadeEnemy:
+	{
+		std::cout << "EvadeEnemy" << std::endl;
+		break;
+	}
+	case AgentState::PickupLoot:
+	{
+		std::cout << "PickupLoot" << std::endl;
 		break;
 	}
 	}
@@ -170,19 +143,206 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 #pragma region ATTACK
 SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 {
-	return SteeringPlugin_Output();
+	SteeringPlugin_Output steering{};
+	if (m_pBB->enemies.empty())
+		return steering;
+
+	//FIND CLOSEST ENEMY
+	const EnemyInfo* closest = nullptr;
+	float bestDist = FLT_MAX;
+	for (auto const& e : m_pBB->enemies)
+	{
+		float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
+		if (d < bestDist)
+		{
+			bestDist = d; 
+			closest = &e;
+		}
+	}
+
+	if (closest)
+	{
+		//IF CLOSE ENOUGH, STOP AND SHOOT
+		const float attackRange = m_pBB->agent.GrabRange * 2.f;
+		if (bestDist < attackRange * attackRange)
+		{
+			steering.LinearVelocity = Elite::ZeroVector2;
+			steering.AutoOrient = true;
+			if (m_pBB->weaponSlot >= 0)
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
+		}
+		else
+		{
+			Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(closest->Location);
+			Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt); //TODO: maybe change to pursuit, might be better
+			steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+			steering.AutoOrient = true;
+		}
+	}
+	return steering;
 }
 #pragma endregion
 
 #pragma region EVADE_ENEMY
 SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 {
-	return SteeringPlugin_Output();
+	SteeringPlugin_Output steering{};
+	if (m_pBB->enemies.empty())
+		return steering;
+
+	//FLEE FROM CLOSEST ENEMY
+	const EnemyInfo* closest = nullptr;
+	float bestDist = FLT_MAX;
+	for (auto const& e : m_pBB->enemies)
+	{
+		float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
+		if (d < bestDist)
+		{
+			bestDist = d;
+			closest = &e;
+		}
+	}
+
+	if (closest)
+	{
+		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Flee(m_pBB->agent, closest->Location);
+		steering.LinearVelocity = fleeDir * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
+	}
+	return steering;
 }
 #pragma endregion 
 #pragma region PICKUP_LOOT
 SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 {
+	SteeringPlugin_Output steering{};
+	if (m_pBB->items.empty() || m_pBB->freeSlot < 0)
+		return steering;
+
+	//FIND CLOSEST NON GARBAGE ITEM
+	const ItemInfo* closest = nullptr;
+	float bestDist = FLT_MAX;
+	for (auto const& i : m_pBB->items)
+	{
+		if (i.Type == eItemType::GARBAGE)
+			continue;
+		float d = (i.Location - m_pBB->agent.Position).MagnitudeSquared();
+		if (d < bestDist)
+		{
+			bestDist = d;
+			closest = &i;
+		}
+	}
+
+	if (!closest) 
+		return steering;
+
+	if (bestDist < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
+	{
+		ItemInfo item = *closest;
+		if (m_pInterface->GrabItem(item))
+			m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item);
+	}
+	else
+	{
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(closest->Location);
+		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
+	}
+	return steering;
+}
+#pragma endregion
+
+
+#pragma region HELPER
+void FiniteStateMachine::PopulateBlackboard()
+{
+	m_pBB->agent = m_pInterface->Agent_GetInfo();
+	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
+	m_pBB->items = m_pInterface->GetItemsInFOV();
+	m_pBB->houses = m_pInterface->GetHousesInFOV();
+	m_pBB->worldInfo = m_pInterface->World_GetInfo();
+
+	m_pBB->hasWeapon = false;
+	m_pBB->weaponSlot = -1;
+	m_pBB->freeSlot = -1;
+	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
+	for (int i = 0; i < invCap; ++i)
+	{
+		ItemInfo item{};
+		if (m_pInterface->Inventory_GetItem(i, item))
+		{
+			if (item.Type == eItemType::PISTOL || item.Type == eItemType::SHOTGUN)
+			{
+				m_pBB->hasWeapon = true;
+				if (m_pBB->weaponSlot == -1)
+					m_pBB->weaponSlot = i;
+			}
+		}
+		else if (m_pBB->freeSlot == -1)
+		{
+			m_pBB->freeSlot = i;
+		}
+	}
+	for (auto const& h : m_pBB->houses)
+	{
+		bool seen = false;
+		for (auto const& known : m_pBB->knownHouseCenters)
+			if ((known - h.Center).MagnitudeSquared() < 0.01f)
+			{
+				seen = true;
+				break;
+			}
+		if (!seen)
+			m_pBB->knownHouseCenters.push_back(h.Center);
+	}
+}
+void FiniteStateMachine::InitAndUpdateGrid()
+{
+	if (!m_pGrid->IsInitialized()) m_pGrid->InitGrid(m_pBB.get());
+	if (!m_HasEnteredFirstState) OnEnter(), m_HasEnteredFirstState = true;
+	m_pGrid->UpdateFOVGrid();
+
+}
+SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
+{
+
+
+	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get());
+	if (next != m_CurrentState)
+		OnExit(), m_CurrentState = next, OnEnter();
+
+	switch (m_CurrentState)
+	{
+	case AgentState::Explore:
+	{
+		return UpdateExplore(dt);
+		break;
+	}
+	case AgentState::GoToHouse:
+	{
+		return UpdateGoToHouse(dt);
+		break;
+	}
+	case AgentState::Attack:
+	{
+		return UpdateAttack(dt);
+		break;
+	}
+	case AgentState::EvadeEnemy:
+	{
+		return UpdateEvadeEnemy(dt);
+		break;
+	}
+	case AgentState::PickupLoot:
+	{
+		return PickupLoot(dt);
+		break;
+	}
+	}
 	return SteeringPlugin_Output();
+
+
 }
 #pragma endregion

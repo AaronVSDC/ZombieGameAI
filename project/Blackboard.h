@@ -14,4 +14,7 @@ struct Blackboard
     std::vector<Elite::Vector2> visitedHouseCenters; 
     bool                 hasHouseTarget = false;
     Elite::Vector2       currentHouseTarget{};
+	bool                 hasWeapon = false;      
+    int                  weaponSlot = -1;        
+    int                  freeSlot = -1;    
 };

@@ -4,12 +4,26 @@
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb)
 {
     
+    //ENEMY HANDLING HAS PRIORITY
+    if (!bb->enemies.empty())
+    {
+        if (bb->hasWeapon)
+            return AgentState::Attack;
+        return AgentState::EvadeEnemy;
+    }
+
+    //ITEM HANDLING WHEN THERE IS FREE SPACE
+    if (!bb->items.empty() && bb->freeSlot >= 0)
+        return AgentState::PickupLoot;
+
+    //CONTINUE GOING TO HOUSE TARGET IF IS SET
     if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)
         return AgentState::GoToHouse;
-    if (SelectNextHouse(bb))
-        return AgentState::GoToHouse; 
 
-	return AgentState::Explore;
+    if (SelectNextHouse(bb))
+        return AgentState::GoToHouse;
+
+    return AgentState::Explore;
 
 }
 bool StateDecider::SelectNextHouse(Blackboard* bb) const
