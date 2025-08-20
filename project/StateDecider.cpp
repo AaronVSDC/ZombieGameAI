@@ -12,11 +12,15 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         // reset timer whenever a threat is detected
         m_TotalTime = 0.f;
 
-        if (bb->hasWeapon)
+        if (bb->hasWeapon && bb->weaponAmmo > 0)
             return AgentState::Attack;
 
         return AgentState::EvadeEnemy;
-    }
+    } 
+
+    // Keep attacking as long as we still have a valid target and ammo
+    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->lastEnemyValid)
+        return AgentState::Attack;
 
     // Continue evading for a short period after losing sight of the enemy
     if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration && bb->lastEnemyValid)
@@ -36,6 +40,7 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         return AgentState::GoToHouse;
 
     return AgentState::Explore;
+
 
 }
 bool StateDecider::SelectNextHouse(Blackboard* bb) const

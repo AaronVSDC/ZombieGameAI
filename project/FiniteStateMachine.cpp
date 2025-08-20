@@ -181,44 +181,20 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		float desiredOrientation = atan2f(toEnemy.y, toEnemy.x);
 		float orientationDiff = atan2f(sinf(desiredOrientation - m_pBB->agent.Orientation),
 			cosf(desiredOrientation - m_pBB->agent.Orientation));
-		float dist = sqrtf(bestDist);
 
-		// Check if enemy is within the current FOV
-		bool enemyInFOV = (dist < m_pBB->agent.FOV_Range) &&
-			(fabsf(orientationDiff) < m_pBB->agent.FOV_Angle * 0.5f);
+		// Stand still while attacking
+		steering.LinearVelocity = Elite::ZeroVector2;
+		steering.AutoOrient = false;
 
-		// If not in FOV, rotate in place until we see the enemy
-		if (!enemyInFOV)
+		if (fabsf(orientationDiff) > 0.05f)
 		{
-			steering.LinearVelocity = Elite::ZeroVector2;
-			steering.AutoOrient = false;
 			steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
-			return steering;
-		}
-
-		// When in sight, decide to shoot or approach
-		const float attackRange = m_pBB->agent.GrabRange * 2.f;
-		if (dist < attackRange)
-		{
-			steering.LinearVelocity = Elite::ZeroVector2;
-			steering.AutoOrient = false;
-			if (fabsf(orientationDiff) > 0.05f)
-			{
-				steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
-			} 
-			else
-			{
-				steering.AngularVelocity = 0.f;
-				if (m_pBB->weaponSlot >= 0)
-					m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
-			}
 		}
 		else
 		{
-			Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(closest->Location);
-			Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt); //TODO: maybe change to pursuit, might be better
-			steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
-			steering.AutoOrient = true;
+			steering.AngularVelocity = 0.f;
+			if (m_pBB->weaponSlot >= 0)
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
 		}
 	}
 	return steering;
@@ -358,8 +334,13 @@ void FiniteStateMachine::PopulateBlackboard()
 		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
 		m_pBB->lastEnemyValid = true;
 	}
+	else
+	{
+		m_pBB->lastEnemyValid = false;
+	}
 	m_pBB->hasWeapon = false;
 	m_pBB->weaponSlot = -1;
+	m_pBB->weaponAmmo = 0;
 	m_pBB->freeSlot = -1;
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
 
@@ -376,13 +357,20 @@ void FiniteStateMachine::PopulateBlackboard()
 			{
 				m_pBB->inventory[i] = invItem.Type;
 
-				if ((invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
+				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
 				{
-					m_pBB->hasWeapon = true;
-					m_pBB->weaponSlot = i;
+					if (m_pBB->weaponSlot == -1)
+					{
+						m_pBB->hasWeapon = true;
+						m_pBB->weaponSlot = i;
+					}
+					if (i == m_pBB->weaponSlot)
+					{
+						m_pBB->weaponAmmo = invItem.Value;
+					}
 				}
 			}
-			else
+			else 
 			{
 				m_pBB->inventory[i] = eItemType::GARBAGE;
 			}

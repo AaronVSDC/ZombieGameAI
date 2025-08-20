@@ -16,7 +16,8 @@ struct Blackboard
     Elite::Vector2       currentHouseTarget{};
     std::vector<eItemType> inventory;
     bool                 hasWeapon = false;
-    int                  weaponSlot = -1;
+    int                  weaponAmmo = 0;
+	int                  weaponSlot = -1;
     int                  freeSlot = -1;
     EnemyInfo             lastEnemy{};
     bool                  lastEnemyValid = false;
