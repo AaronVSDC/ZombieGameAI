@@ -187,8 +187,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 {
 	SteeringPlugin_Output steering{};
-	if (m_pBB->enemies.empty())
-		return steering;
 
 	//FLEE FROM CLOSEST ENEMY
 	const EnemyInfo* closest = nullptr;
@@ -205,9 +203,10 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 	if (closest)
 	{
-		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Flee(m_pBB->agent, closest->Location);
+		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Evade(m_pBB->agent, closest->Location, closest->LinearVelocity);
 		steering.LinearVelocity = fleeDir * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
+		steering.RunMode = true; 
 	}
 	return steering;
 }
@@ -330,7 +329,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 {
 
 
-	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get());
+	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get(), dt);
 	if (next != m_CurrentState)
 		OnExit(), m_CurrentState = next, OnEnter();
 

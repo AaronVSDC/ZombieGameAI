@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "Grid.h"
-
 void Grid::UpdateFOVGrid()
 {
 	float halfAngle = m_BB->agent.FOV_Angle * 0.5f;
@@ -59,32 +58,44 @@ Elite::Vector2 Grid::GetNextFrontierTarget() const
     if (m_Frontiers.empty())
         return m_BB->agent.Position;
 
-    Elite::Vector2 facing{ cosf(m_BB->agent.Orientation), sinf(m_BB->agent.Orientation) };
+    const Elite::Vector2 pos = m_BB->agent.Position;
+    const float eps = 1e-4f;
 
-    // Weight that controls how much the angle with the current direction
-    // influences the selection. Higher values bias the selection to targets
-    // that deviate from the current heading.
-    constexpr float angleWeight = 2.f;
+    auto dist2 = [&](const Elite::Vector2& p) {
+        Elite::Vector2 d = p - pos;
+        return d.x * d.x + d.y * d.y;
+        };
 
-    auto it = std::min_element(m_Frontiers.begin(), m_Frontiers.end(),
-        [&](const Elite::Vector2& a, const Elite::Vector2& b)
+    auto better = [&](const Elite::Vector2& a, const Elite::Vector2& b) {
+        switch (m_Mode & 3)
         {
-            auto score = [&](const Elite::Vector2& target)
-                {
-                    float distance = Elite::Distance(target, m_BB->agent.Position);
+        case 0: // Topmost (max Y)
+            if (a.y > b.y + eps) return true;
+            if (b.y > a.y + eps) return false;
+            return dist2(a) < dist2(b);
+        case 1: // Rightmost (max X)
+            if (a.x > b.x + eps) return true;
+            if (b.x > a.x + eps) return false;
+            return dist2(a) < dist2(b);
+        case 2: // Bottommost (min Y)
+            if (a.y < b.y - eps) return true;
+            if (b.y < a.y - eps) return false;
+            return dist2(a) < dist2(b);
+        default: // Leftmost (min X) 
+            if (a.x < b.x - eps) return true;
+            if (b.x < a.x - eps) return false;
+            return dist2(a) < dist2(b);
+        }
+        };
 
-                    Elite::Vector2 dir = (target - m_BB->agent.Position).GetNormalized();
-                    float dot = facing.Dot(dir);
-                    dot = max(-1.f, min(1.f, dot)); 
-                    float angle = acosf(dot);
+    const Elite::Vector2* best = &m_Frontiers[0];
+    for (const auto& p : m_Frontiers)
+        if (better(p, *best)) best = &p;
 
-                    return distance + angleWeight * angle;
-                };
+    // advance cycle; order doesn't matter
+    m_Mode = (m_Mode + 1) & 3;
 
-            return score(a) < score(b);
-        });
-
-    return *it;
+    return *best;
 }
 
 void Grid::DebugDraw(IExamInterface* m_pInterface) const

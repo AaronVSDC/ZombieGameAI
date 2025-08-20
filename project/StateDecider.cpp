@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "StateDecider.h"
 
-AgentState StateDecider::Decide(AgentState current, Blackboard* bb)
+AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
     
     //ENEMY HANDLING HAS PRIORITY
@@ -9,7 +9,9 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb)
     {
         if (bb->hasWeapon)
             return AgentState::Attack;
-        return AgentState::EvadeEnemy;
+
+            return AgentState::EvadeEnemy;
+   
     }
 
     //ITEM HANDLING WHEN THERE IS FREE SPACE

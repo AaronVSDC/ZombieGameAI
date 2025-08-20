@@ -50,6 +50,7 @@ private:
 	bool m_IsInitialized = false; 
 
 	void DetectFrontiers(); 
+	mutable int m_Mode = 0; 
 
 
 
