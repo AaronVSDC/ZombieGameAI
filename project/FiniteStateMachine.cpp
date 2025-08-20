@@ -278,25 +278,33 @@ void FiniteStateMachine::PopulateBlackboard()
 	m_pBB->freeSlot = -1;
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
 
-	//Ensure local inventory cache matches the actual agent inventory
-	m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
+	if (m_pBB->inventory.size() != static_cast<size_t>(invCap))
+		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
+
+	//Only query slots that we believe contain an item
 	for (int i = 0; i < invCap; ++i)
 	{
-		ItemInfo invItem{};
-		if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
+		if (m_pBB->inventory[i] != eItemType::GARBAGE)
 		{
-			m_pBB->inventory[i] = invItem.Type;
-
-			if ((invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
+			ItemInfo invItem{};
+			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
 			{
-				m_pBB->hasWeapon = true;
-				m_pBB->weaponSlot = i; 
+				m_pBB->inventory[i] = invItem.Type;
+
+				if ((invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN) && m_pBB->weaponSlot == -1)
+				{
+					m_pBB->hasWeapon = true;
+					m_pBB->weaponSlot = i;
+				}
+			}
+			else
+			{
+				m_pBB->inventory[i] = eItemType::GARBAGE;
 			}
 		}
-		else if (m_pBB->freeSlot == -1)
-		{
+
+		if (m_pBB->inventory[i] == eItemType::GARBAGE && m_pBB->freeSlot == -1)
 			m_pBB->freeSlot = i;
-		}
 	}
 	for (auto const& h : m_pBB->houses)
 	{
