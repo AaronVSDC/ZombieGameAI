@@ -85,10 +85,11 @@ void FiniteStateMachine::OnEnter()
 		}
 
 		Elite::Vector2 half = current.Size * 0.5f;
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -half.x, -half.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ half.x, -half.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ half.x, half.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -half.x, half.y });
+		Elite::Vector2 offset = half * 0.5f; 
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, -offset.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, -offset.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, offset.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, offset.y });
 		m_HouseExitTarget = current.Center + Elite::Vector2{ current.Size.x, 0.f };
 
 		if (!m_HouseExploreTargets.empty())
