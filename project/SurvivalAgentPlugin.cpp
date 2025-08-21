@@ -43,7 +43,7 @@ void SurvivalAgentPlugin::InitGameDebugParams(GameDebugParams& params)
 	//params.AutoGrabClosestItem = true; //A call to Item_Grab(...) returns the closest item that can be grabbed. (EntityInfo argument is ignored)
 	//params.StartingDifficultyStage = 1;
 	//params.InfiniteStamina = false;
-	params.SpawnDebugPistol = true;
+	//params.SpawnDebugPistol = true;
 	//params.SpawnDebugShotgun = true;
 	params.SpawnPurgeZonesOnMiddleClick = true;
 	params.PrintDebugMessages = true;

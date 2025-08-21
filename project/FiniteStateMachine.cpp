@@ -381,18 +381,22 @@ void FiniteStateMachine::PopulateBlackboard()
 
 				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
 				{
-					if (m_pBB->weaponSlot == -1)
+					if (invItem.Value == 0)
 					{
+						// discard empty weapon
+						m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+						m_pBB->inventory[i] = eItemType::GARBAGE;
+					}
+					else if (m_pBB->weaponSlot == -1)
+					{
+						// select the first weapon with ammo 
 						m_pBB->hasWeapon = true;
 						m_pBB->weaponSlot = i;
-					}
-					if (i == m_pBB->weaponSlot)
-					{
 						m_pBB->weaponAmmo = invItem.Value;
 					}
 				}
 			}
-			else 
+			else
 			{
 				m_pBB->inventory[i] = eItemType::GARBAGE;
 			}
