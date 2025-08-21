@@ -163,12 +163,9 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		}
 	}
 
-	// If none in FOV, fall back to the last known enemy position
-	if (!closest && m_pBB->lastEnemyValid)
-	{
-		closest = &m_pBB->lastEnemy;
-		bestDist = (closest->Location - m_pBB->agent.Position).MagnitudeSquared();
-	}
+	// Stand still during attack state
+	steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
+	steering.AutoOrient = false;
 
 	if (closest)
 	{
@@ -182,14 +179,10 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		float orientationDiff = atan2f(sinf(desiredOrientation - m_pBB->agent.Orientation),
 			cosf(desiredOrientation - m_pBB->agent.Orientation));
 
-		// Stand still while attacking
-		steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
-		steering.AutoOrient = false;
-
 		if (fabsf(orientationDiff) > 0.05f)
 		{
 			steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
-		}
+		} 
 		else
 		{
 			steering.AngularVelocity = 0.f;
@@ -197,6 +190,12 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
 		}
 	}
+	else
+	{
+		// No enemy in sight: rotate in place until one becomes visible
+		steering.AngularVelocity = m_pBB->agent.MaxAngularSpeed;
+	}
+
 	return steering;
 }
 #pragma endregion
