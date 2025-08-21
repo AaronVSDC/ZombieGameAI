@@ -13,17 +13,19 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         m_TotalTime = 0.f;
 
         if (bb->hasWeapon && bb->weaponAmmo > 0)
+        {
+            bb->attackLatched = true; 
             return AgentState::Attack;
-
+        }
         return AgentState::EvadeEnemy;
     } 
 
     // Keep attacking as long as we still have a valid target and ammo
-    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0)
+    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && (bb->attackLatched || bb->lastEnemyValid))
         return AgentState::Attack;
 
     // Continue evading for a short period after losing sight of the enemy
-    if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration && bb->lastEnemyValid)
+    if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
         return AgentState::EvadeEnemy;
 
     //ITEM HANDLING WHEN THERE IS FREE SPACE

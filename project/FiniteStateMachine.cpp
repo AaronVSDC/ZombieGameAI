@@ -150,30 +150,25 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-	// Try to find the closest enemy in FOV
+	// Find closest enemy in sight
 	const EnemyInfo* closest = nullptr;
 	float bestDist = FLT_MAX;
 	for (auto const& e : m_pBB->enemies)
 	{
 		float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
-		if (d < bestDist)
-		{
-			bestDist = d;
-			closest = &e;
-		}
+		if (d < bestDist) { bestDist = d; closest = &e; }
 	}
 
-	// Stand still during attack state
+	// stand still
 	steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
 	steering.AutoOrient = false;
 
 	if (closest)
 	{
-		// Remember this enemy so we can keep tracking when it leaves the FOV
+		// we have a target
 		m_pBB->lastEnemy = *closest;
 		m_pBB->lastEnemyValid = true;
 
-		// Calculate orientation to enemy
 		Elite::Vector2 toEnemy = closest->Location - m_pBB->agent.Position;
 		float desiredOrientation = atan2f(toEnemy.y, toEnemy.x);
 		float orientationDiff = atan2f(sinf(desiredOrientation - m_pBB->agent.Orientation),
@@ -181,19 +176,37 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 
 		if (fabsf(orientationDiff) > 0.05f)
 		{
-			steering.AngularVelocity = Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
-		} 
+			steering.AngularVelocity =
+				Elite::Clamp(orientationDiff, -1.f, 1.f) * m_pBB->agent.MaxAngularSpeed;
+		}
 		else
 		{
 			steering.AngularVelocity = 0.f;
-			if (m_pBB->weaponSlot >= 0)
+
+			// shoot if we can 
+			if (m_pBB->weaponSlot >= 0 && m_pBB->weaponAmmo > 0)
+			{
 				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
+
+				// shot taken -> unlatch and drop target
+				m_pBB->attackLatched = false;
+				m_pBB->lastEnemyValid = false;
+			}
 		}
 	}
 	else
 	{
-		// No enemy in sight: rotate in place until one becomes visible
-		steering.AngularVelocity = m_pBB->agent.MaxAngularSpeed;
+	   // No enemy in sight: rotate to search, but DON'T mark lastEnemyValid true here
+		const float omega = m_pBB->agent.MaxAngularSpeed;
+		steering.AngularVelocity = omega;
+
+		m_SearchRotationAccumulation += fabsf(omega) * dt;
+
+		if (m_SearchRotationAccumulation >= Elite::ToRadians(360.f))
+		{
+			m_pBB->attackLatched = false;
+			m_SearchRotationAccumulation = 0.f; // ready for next time
+		}
 	}
 
 	return steering;
