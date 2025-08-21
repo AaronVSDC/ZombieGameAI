@@ -105,7 +105,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	if (m_FrontierWanderTimer > 0.f)
 	{
 		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f, .8f) * m_pBB->agent.MaxLinearSpeed;
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 5.f, .2f) * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
 		if (m_FrontierWanderTimer <= 0.f)
 			m_Target = m_pGrid->GetNextFrontierTarget();
@@ -212,26 +212,32 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-	//FLEE FROM CLOSEST ENEMY (OR LAST KNOWN ENEMY WHEN NOT IN FOV)
+	//FLEE FROM ALL ENEMIES (OR LAST KNOWN ENEMY WHEN NOT IN FOV)
 	const EnemyInfo* closest = nullptr;
 	float bestDist = FLT_MAX;
-	for (auto const& e : m_pBB->enemies)
-	{
-		float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
-		if (d < bestDist)
-		{
-			bestDist = d;
-			closest = &e;
-		}
-	}
+	Elite::Vector2 fleeDir{};
 
-	if (closest)
+	if (!m_pBB->enemies.empty())
 	{
-		// Remember enemy in case it leaves the FOV next frame
+		for (auto const& e : m_pBB->enemies)
+		{
+			float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
+			if (d < bestDist)
+			{
+				bestDist = d;
+				closest = &e;
+			}
+
+			Elite::Vector2 away = m_pSteeringBehaviour->Evade(
+				m_pBB->agent, e.Location, e.LinearVelocity);
+			float weight = 1.f / (d + 0.001f);
+			fleeDir += away * weight;
+		}
+		fleeDir.Normalize();
 		m_pBB->lastEnemy = *closest;
 		m_pBB->lastEnemyValid = true;
 	}
-	else if (m_pBB->agent.WasBitten) 
+	else if (m_pBB->agent.WasBitten)
 	{
 		float angle = m_pBB->agent.Orientation;
 		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
@@ -239,22 +245,19 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
 		m_pBB->lastEnemyValid = true;
 		closest = &m_pBB->lastEnemy;
+		fleeDir = m_pSteeringBehaviour->Evade(
+			m_pBB->agent, closest->Location, closest->LinearVelocity);
 	}
 	else if (m_pBB->lastEnemyValid)
 	{
 		closest = &m_pBB->lastEnemy;
+		fleeDir = m_pSteeringBehaviour->Evade(
+			m_pBB->agent, closest->Location, closest->LinearVelocity);
 	}
 
 	if (closest)
 	{
-		// Calculate a target position in the opposite direction of the threat and
-		// seek that position using the navmesh. This prevents the agent from
-		// continuously pushing against obstacles when evading. 
-		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Evade(
-			m_pBB->agent, closest->Location, closest->LinearVelocity);
-
-		// Move far enough away from the threat
-		constexpr float fleeTargetDistance = 15.f;
+		constexpr float fleeTargetDistance = 25.f;
 		Elite::Vector2 fleeTarget = m_pBB->agent.Position + fleeDir * fleeTargetDistance;
 
 		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(fleeTarget);
@@ -262,20 +265,23 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
+
 		if (m_WantsToRun)
 		{
 			if (m_pBB->agent.Stamina <= 0.1f)
-				m_WantsToRun = false;   
+				m_WantsToRun = false;
 		}
 		else
 		{
-			if (m_pBB->agent.Stamina >= 9.9f)
-				m_WantsToRun = true;    
+			if (m_pBB->agent.Stamina >= 9.9f) 
+				m_WantsToRun = true;
 		}
-
-		steering.RunMode = m_WantsToRun;
 	}
 	return steering;
+
+
+
+	steering.RunMode = m_WantsToRun;
 }
 #pragma endregion
 
