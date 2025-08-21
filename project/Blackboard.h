@@ -23,4 +23,5 @@ struct Blackboard
     bool                  lastEnemyValid = false;
     bool                  attackLatched = false;   
     float                 lastHealth = 0.f;
+    bool                  hasNonGarbage = false; 
 };

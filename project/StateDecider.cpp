@@ -4,33 +4,17 @@
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
     m_TotalTime += dt;
-    if (!bb->enemies.empty() || bb->agent.Bitten)
-    {
-        m_TotalTime = 0.f;
 
-        if (bb->hasWeapon && bb->weaponAmmo > 0)
-        {
-            bb->attackLatched = true; 
-            return AgentState::Attack;
-        }
-    } 
+    SelectState(current, bb, dt);
 
-    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->attackLatched)
+    if (current == AgentState::Attack && bb->attackLatched)
         return AgentState::Attack;
 
-
-    bool hasNonGarbage = std::any_of(bb->items.begin(), bb->items.end(),
-        [](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
-    if (hasNonGarbage && bb->freeSlot >= 0)
+    if (current == AgentState::PickupLoot)
         return AgentState::PickupLoot;
 
-    if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)
+    if (current == AgentState::GoToHouse)
         return AgentState::GoToHouse;
-
-    if (SelectNextHouse(bb))
-        return AgentState::GoToHouse;
-
-    if (!bb->hasWeapon && bb->weaponAmmo > 0) current = AgentState::EvadeEnemy;
 
     if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
         return AgentState::EvadeEnemy;
@@ -38,6 +22,26 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
     return AgentState::Explore;
 
 
+}
+void StateDecider::SelectState(AgentState current, Blackboard* bb, float dt) 
+{
+    if (!bb->enemies.empty() || bb->agent.Bitten)
+    {
+        if (bb->hasWeapon && bb->weaponAmmo > 0)
+        {
+            bb->attackLatched = true;
+            current = AgentState::Attack;
+        }
+        else
+        {
+            current = AgentState::EvadeEnemy;
+        }
+    }
+    else if (bb->hasNonGarbage && bb->freeSlot >= 0)
+        current = AgentState::PickupLoot;
+     
+    else if (bb->hasHouseTarget && !bb->agent.IsInHouse || SelectNextHouse(bb))
+        current = AgentState::GoToHouse;
 }
 bool StateDecider::SelectNextHouse(Blackboard* bb) const
 {

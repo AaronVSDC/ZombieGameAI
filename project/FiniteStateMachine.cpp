@@ -15,6 +15,8 @@ SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 {
 	PopulateBlackboard();
 	InitAndUpdateGrid();
+	UpdateInventoryInfo();
+	UpdateHouseMemory(); 
 	return UpdateStates(dt);
 
 }
@@ -335,10 +337,7 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 #pragma region HELPER
 void FiniteStateMachine::PopulateBlackboard()
 {
-	m_pBB->agent = m_pInterface->Agent_GetInfo();
-
-	// m_pBB->lastHealth = m_pBB->agent.Health;
-
+	m_pBB->agent = m_pInterface->Agent_GetInfo(); 
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
 	m_pBB->items = m_pInterface->GetItemsInFOV();
 	m_pBB->houses = m_pInterface->GetHousesInFOV();
@@ -353,8 +352,7 @@ void FiniteStateMachine::InitAndUpdateGrid()
 }
 SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 {
-	UpdateInventoryInfo();
-	UpdateHouseMemory(); 
+
 
 	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get(), dt);
 	if (next != m_CurrentState)
