@@ -183,7 +183,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 			cosf(desiredOrientation - m_pBB->agent.Orientation));
 
 		// Stand still while attacking
-		steering.LinearVelocity = Elite::ZeroVector2;
+		steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
 		steering.AutoOrient = false;
 
 		if (fabsf(orientationDiff) > 0.05f)
