@@ -3,45 +3,38 @@
 
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
+    // Keep track of time since last direct enemy interaction
     m_TotalTime += dt;
 
-    SelectState(current, bb, dt);
+    if (!bb->enemies.empty() || bb->agent.Bitten)
+    {
+        m_TotalTime = 0.f;
+        if (bb->hasWeapon && bb->weaponAmmo > 0)
+        {
+            bb->attackLatched = true; 
+            return AgentState::Attack;
+        }
+        return AgentState::EvadeEnemy;
+    } 
 
-    if (current == AgentState::Attack && bb->attackLatched)
+    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->attackLatched)
         return AgentState::Attack;
-
-    if (current == AgentState::PickupLoot)
-        return AgentState::PickupLoot;
-
-    if (current == AgentState::GoToHouse)
-        return AgentState::GoToHouse;
 
     if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
         return AgentState::EvadeEnemy;
 
+    if (bb->hasNonGarbage && bb->freeSlot >= 0)
+        return AgentState::PickupLoot;
+
+    if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)
+        return AgentState::GoToHouse;
+
+    if (SelectNextHouse(bb))
+        return AgentState::GoToHouse;
+
     return AgentState::Explore;
 
 
-}
-void StateDecider::SelectState(AgentState current, Blackboard* bb, float dt) 
-{
-    if (!bb->enemies.empty() || bb->agent.Bitten)
-    {
-        if (bb->hasWeapon && bb->weaponAmmo > 0)
-        {
-            bb->attackLatched = true;
-            current = AgentState::Attack;
-        }
-        else
-        {
-            current = AgentState::EvadeEnemy;
-        }
-    }
-    else if (bb->hasNonGarbage && bb->freeSlot >= 0)
-        current = AgentState::PickupLoot;
-     
-    else if (bb->hasHouseTarget && !bb->agent.IsInHouse || SelectNextHouse(bb))
-        current = AgentState::GoToHouse;
 }
 bool StateDecider::SelectNextHouse(Blackboard* bb) const
 {

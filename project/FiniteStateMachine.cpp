@@ -441,6 +441,13 @@ void FiniteStateMachine::UpdateInventoryInfo()
 			m_pBB->freeSlot = i;
 	}
 
+	bool hasNonGarbage = std::any_of(m_pBB->items.begin(), m_pBB->items.end(),
+		[](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
+	m_pBB->hasNonGarbage = hasNonGarbage;
+
+
+
+	//TODO: MOVE INTO SEPERATE USE ITEM STATE 
 	constexpr float lowThreshold{ 5.f };
 	if (m_pBB->agent.Energy < lowThreshold)
 	{
