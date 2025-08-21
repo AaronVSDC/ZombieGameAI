@@ -20,6 +20,7 @@ struct Blackboard
 	int                  weaponSlot = -1;
     int                  freeSlot = -1;
     EnemyInfo             lastEnemy{};
+    bool                  lastEnemyValid = false;
     bool                  attackLatched = false;   
     float                 lastHealth = 0.f;
 };
