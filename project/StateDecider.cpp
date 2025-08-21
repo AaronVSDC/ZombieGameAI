@@ -25,11 +25,13 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 
     for (auto const& item : bb->inventory)
     {
-        if (item.Type == eItemType::MEDKIT && bb->agent.Health <= 10.f - item.Value)
+        if (item.Type == eItemType::MEDKIT && bb->agent.Health <= 10.f - static_cast<float>(item.Value))
             return AgentState::UseItem;
-        if (item.Type == eItemType::FOOD && bb->agent.Energy <= 10.f - item.Value)
+        if (item.Type == eItemType::FOOD && bb->agent.Energy <= 10.f - static_cast<float>(item.Value))
             return AgentState::UseItem;
     }
+    if (bb->agent.IsInHouse)
+        return AgentState::ExploreHouse;
 
     if (bb->hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;

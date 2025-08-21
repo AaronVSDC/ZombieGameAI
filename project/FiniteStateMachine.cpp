@@ -63,6 +63,38 @@ void FiniteStateMachine::OnEnter()
 		m_Target = bestHouse;
 		break;
 	}
+	case AgentState::ExploreHouse:
+	{
+		std::cout << "ExploreHouse" << std::endl;
+		m_HouseItems.clear();
+		m_HouseExploreTargets.clear();
+		m_CurrentHouseExploreIndex = 0;
+		m_HouseExplorationComplete = false;
+
+		const auto& houses = m_pBB->houses;
+		float bestDistSqr = FLT_MAX;
+		HouseInfo current{};
+		for (auto const& h : houses)
+		{
+			float d = (h.Center - m_pBB->agent.Position).MagnitudeSquared();
+			if (d < bestDistSqr)
+			{
+				bestDistSqr = d;
+				current = h;
+			}
+		}
+
+		Elite::Vector2 half = current.Size * 0.5f;
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -half.x, -half.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ half.x, -half.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ half.x, half.y });
+		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -half.x, half.y });
+		m_HouseExitTarget = current.Center + Elite::Vector2{ current.Size.x, 0.f };
+
+		if (!m_HouseExploreTargets.empty())
+			m_Target = m_HouseExploreTargets[0];
+		break;
+	}
 	case AgentState::Attack:
 	{
 		std::cout << "Attack" << std::endl;
@@ -139,6 +171,83 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 		m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
 		m_pBB->hasHouseTarget = false;
 	}
+	return steering;
+}
+#pragma endregion
+#pragma region EXPLORE_HOUSE
+SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
+{
+	SteeringPlugin_Output steering{};
+
+	for (auto const& item : m_pBB->items)
+	{
+		if (item.Type == eItemType::GARBAGE)
+			continue;
+		bool known = false;
+		for (auto const& knownItem : m_HouseItems)
+		{
+			if ((knownItem.Location - item.Location).MagnitudeSquared() < 0.01f)
+			{
+				known = true;
+				break;
+			}
+		}
+		if (!known)
+			m_HouseItems.push_back(item);
+	}
+
+	if (!m_HouseExplorationComplete && m_CurrentHouseExploreIndex < m_HouseExploreTargets.size())
+	{
+		Elite::Vector2 target = m_HouseExploreTargets[m_CurrentHouseExploreIndex];
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(target);
+		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
+
+		if (Elite::Distance(m_pBB->agent.Position, target) < 1.f)
+		{
+			++m_CurrentHouseExploreIndex;
+			if (m_CurrentHouseExploreIndex >= m_HouseExploreTargets.size())
+				m_HouseExplorationComplete = true;
+		}
+		return steering;
+	}
+
+	if (!m_HouseItems.empty() && m_pBB->freeSlot >= 0)
+	{
+		ItemInfo item = m_HouseItems.front();
+		if (Elite::Distance(m_pBB->agent.Position, item.Location) < m_pBB->agent.GrabRange)
+		{
+			if (m_pInterface->GrabItem(item))
+			{
+				if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
+				{
+					if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
+						m_pBB->inventory[m_pBB->freeSlot] = item;
+					m_HouseItems.erase(m_HouseItems.begin());
+					m_pBB->freeSlot = -1;
+				}
+			}
+		}
+		else
+		{
+			Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(item.Location);
+			Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+			steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+			steering.AutoOrient = true;
+		}
+		return steering;
+	}
+
+	if (m_pBB->agent.IsInHouse)
+	{
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_HouseExitTarget);
+		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
+		return steering;
+	}
+
 	return steering;
 }
 #pragma endregion
@@ -276,12 +385,13 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 			if (m_pBB->agent.Stamina >= 9.9f) 
 				m_WantsToRun = true;
 		}
+		steering.RunMode = m_WantsToRun;
+
 	}
 	return steering;
 
 
 
-	steering.RunMode = m_WantsToRun;
 }
 #pragma endregion
 
@@ -410,6 +520,11 @@ SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 	case AgentState::GoToHouse:
 	{
 		return UpdateGoToHouse(dt);
+		break;
+	}
+	case AgentState::ExploreHouse:
+	{
+		return UpdateExploreHouse(dt);
 		break;
 	}
 	case AgentState::Attack:

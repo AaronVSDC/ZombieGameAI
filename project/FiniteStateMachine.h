@@ -23,7 +23,14 @@ class FiniteStateMachine
 
 	float m_SearchRotationAccumulation = 0.f;
 
-	bool m_WantsToRun = false; 
+	bool m_WantsToRun = false;
+
+	//EXPLORE HOUSE
+	std::vector<Elite::Vector2> m_HouseExploreTargets;
+	size_t m_CurrentHouseExploreIndex = 0;
+	std::vector<ItemInfo> m_HouseItems;
+	Elite::Vector2 m_HouseExitTarget{};
+	bool m_HouseExplorationComplete = false;
 
 	void OnEnter(); 
 	void OnExit(); 
@@ -37,7 +44,8 @@ class FiniteStateMachine
 	SteeringPlugin_Output UpdateAttack(float dt); 
 	SteeringPlugin_Output UpdateEvadeEnemy(float dt); 
 	SteeringPlugin_Output PickupLoot(float dt);
-	SteeringPlugin_Output UseItem(float dt);
+	SteeringPlugin_Output UseItem(float dt); 
+	SteeringPlugin_Output UpdateExploreHouse(float dt);
 
 
 
