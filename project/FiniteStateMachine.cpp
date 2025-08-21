@@ -35,8 +35,15 @@ void FiniteStateMachine::OnEnter()
 	{
 		std::cout << "Explore" << std::endl;
 
-		m_pGrid->UpdateFOVGrid(); 
-		m_Target = m_pGrid->GetNextFrontierTarget();
+		m_pGrid->UpdateFOVGrid();
+		 
+		if (m_CrossTargets.empty())
+		{
+			m_ExploreOrigin = m_pBB->worldInfo.Center;
+			GenerateCrossTargets();
+		}
+
+		m_Target = m_CrossTargets[m_CrossTargetIndex];
 		m_FrontierWanderTimer = 0.f;
 		break;
 	}
@@ -135,26 +142,37 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	const float arriveDist = m_pGrid->GetCellSize() * 0.5f;
 	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveDist)
 	{
-		if (m_FrontierWanderTimer <= 0.f)
-			m_FrontierWanderTimer = m_FrontierWanderDuration;
+		++m_CrossTargetIndex; 
+		if (m_CrossTargetIndex >= m_CrossTargets.size())
+			m_CrossTargetIndex = 0;
+		m_Target = m_CrossTargets[m_CrossTargetIndex];
 	}
-
-	if (m_FrontierWanderTimer > 0.f)
-	{
-		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 0.5f, .5f) * m_pBB->agent.MaxLinearSpeed;
-		steering.AutoOrient = true;
-		if (m_FrontierWanderTimer <= 0.f)
-			m_Target = m_pGrid->GetNextFrontierTarget();
-		return steering;
-	} 
 
 	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
 	Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 	steering.AutoOrient = true;
 	steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
-
+	EnableSprint(steering);  
 	return steering;
+}
+void FiniteStateMachine::GenerateCrossTargets()
+{
+	m_CrossTargets.clear();
+
+	Elite::Vector2 center = m_ExploreOrigin;
+	float halfWidth = m_pBB->worldInfo.Dimensions.x * 0.25f;
+	float halfHeight = m_pBB->worldInfo.Dimensions.y * 0.25f;
+
+	m_CrossTargets.push_back(center + Elite::Vector2{ 0.f, halfHeight });
+	m_CrossTargets.push_back(center);
+	m_CrossTargets.push_back(center + Elite::Vector2{ halfWidth, 0.f });
+	m_CrossTargets.push_back(center);
+	m_CrossTargets.push_back(center + Elite::Vector2{ 0.f, -halfHeight });
+	m_CrossTargets.push_back(center);
+	m_CrossTargets.push_back(center + Elite::Vector2{ -halfWidth, 0.f });
+	m_CrossTargets.push_back(center);
+
+	m_CrossTargetIndex = 0;
 }
 #pragma endregion
 #pragma region GO_TO_HOUSE
@@ -168,7 +186,8 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 
 	Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
 	steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
-	steering.AutoOrient = true; 
+	steering.AutoOrient = true;
+	EnableSprint(steering);
 	return steering;
 }
 #pragma endregion
@@ -348,18 +367,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
-
-		if (m_WantsToRun)
-		{
-			if (m_pBB->agent.Stamina <= 0.1f)
-				m_WantsToRun = false;
-		}
-		else
-		{
-			if (m_pBB->agent.Stamina >= 9.9f) 
-				m_WantsToRun = true;
-		}
-		steering.RunMode = m_WantsToRun;
+		EnableSprint(steering); 
 
 	}
 	return steering;
@@ -622,6 +630,21 @@ void FiniteStateMachine::UpdateHouseMemory()
 		m_CurrentHouseExploreIndex = 0;
 		m_HouseExplorationComplete = false;
 	}
+}
+
+void FiniteStateMachine::EnableSprint(SteeringPlugin_Output& steering)
+{
+	if (m_WantsToRun) 
+	{
+		if (m_pBB->agent.Stamina <= 0.1f)
+			m_WantsToRun = false;
+	}
+	else
+	{
+		if (m_pBB->agent.Stamina >= 9.9f)
+			m_WantsToRun = true;
+	}
+	steering.RunMode = m_WantsToRun;
 }
 
 #pragma endregion

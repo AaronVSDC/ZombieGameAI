@@ -25,13 +25,24 @@ class FiniteStateMachine
 
 	bool m_WantsToRun = false;
 
-	//EXPLORE HOUSE
+	//---------------------------------
+	//EXPLORE_HOUSE STATE
+	//---------------------------------
 	std::vector<Elite::Vector2> m_HouseExploreTargets;
 	size_t m_CurrentHouseExploreIndex = 0;
 	std::vector<ItemInfo> m_HouseItems;
 	Elite::Vector2 m_HouseExitTarget{};
 	bool m_HouseExplorationComplete = false;
-	bool m_IsExploringHouse = false; 
+	bool m_IsExploringHouse = false;
+
+
+	//---------------------------------
+	// EXPLORE STATE
+	//---------------------------------
+	Elite::Vector2 m_ExploreOrigin{};
+	std::vector<Elite::Vector2> m_CrossTargets{};
+	size_t m_CrossTargetIndex = 0;
+	void GenerateCrossTargets();
 
 	void OnEnter(); 
 	void OnExit(); 
@@ -64,6 +75,8 @@ public:
 	void UpdateInventoryInfo();
 
 	void UpdateHouseMemory();
+
+	void EnableSprint(SteeringPlugin_Output& steering); 
 
 
 

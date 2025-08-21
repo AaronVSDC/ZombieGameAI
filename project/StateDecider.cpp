@@ -3,7 +3,6 @@
 
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
-    // Keep track of time since last direct enemy interaction
     m_TotalTime += dt;
 
     if (!bb->enemies.empty() || bb->agent.Bitten)
