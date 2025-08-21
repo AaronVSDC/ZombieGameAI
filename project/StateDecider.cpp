@@ -30,11 +30,12 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         if (item.Type == eItemType::FOOD && bb->agent.Energy <= 10.f - static_cast<float>(item.Value))
             return AgentState::UseItem;
     }
-    if (bb->agent.IsInHouse)
-        return AgentState::ExploreHouse;
 
     if (bb->hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;
+
+    if (bb->agent.IsInHouse)
+        return AgentState::ExploreHouse;
 
     if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)
         return AgentState::GoToHouse;

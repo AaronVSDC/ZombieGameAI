@@ -66,34 +66,38 @@ void FiniteStateMachine::OnEnter()
 	case AgentState::ExploreHouse:
 	{
 		std::cout << "ExploreHouse" << std::endl;
-		m_HouseItems.clear();
-		m_HouseExploreTargets.clear();
-		m_CurrentHouseExploreIndex = 0;
-		m_HouseExplorationComplete = false;
-
-		const auto& houses = m_pBB->houses;
-		float bestDistSqr = FLT_MAX;
-		HouseInfo current{};
-		for (auto const& h : houses)
+		if (!m_IsExploringHouse)
 		{
-			float d = (h.Center - m_pBB->agent.Position).MagnitudeSquared();
-			if (d < bestDistSqr)
+			m_IsExploringHouse = true;
+			m_HouseItems.clear();
+			m_HouseExploreTargets.clear();
+			m_CurrentHouseExploreIndex = 0;
+			m_HouseExplorationComplete = false;
+
+			const auto& houses = m_pBB->houses;
+			float bestDistSqr = FLT_MAX;
+			HouseInfo current{};
+			for (auto const& h : houses)
 			{
-				bestDistSqr = d;
-				current = h;
+				float d = (h.Center - m_pBB->agent.Position).MagnitudeSquared();
+				if (d < bestDistSqr)
+				{
+					bestDistSqr = d;
+					current = h;
+				}
 			}
+
+			Elite::Vector2 half = current.Size * 0.5f;
+			Elite::Vector2 offset = half * 0.5f;
+			m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, -offset.y });
+			m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, -offset.y });
+			m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, offset.y });
+			m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, offset.y });
+			m_HouseExitTarget = current.Center + Elite::Vector2{ current.Size.x, 0.f };
+
+			if (!m_HouseExploreTargets.empty())
+				m_Target = m_HouseExploreTargets[0];
 		}
-
-		Elite::Vector2 half = current.Size * 0.5f;
-		Elite::Vector2 offset = half * 0.5f; 
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, -offset.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, -offset.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ offset.x, offset.y });
-		m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, offset.y });
-		m_HouseExitTarget = current.Center + Elite::Vector2{ current.Size.x, 0.f };
-
-		if (!m_HouseExploreTargets.empty())
-			m_Target = m_HouseExploreTargets[0];
 		break;
 	}
 	case AgentState::Attack:
@@ -138,7 +142,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	if (m_FrontierWanderTimer > 0.f)
 	{
 		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 5.f, .2f) * m_pBB->agent.MaxLinearSpeed;
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 0.5f, .5f) * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
 		if (m_FrontierWanderTimer <= 0.f)
 			m_Target = m_pGrid->GetNextFrontierTarget();
@@ -165,13 +169,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
 	steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
 	steering.AutoOrient = true; 
-
-	constexpr float houseArriveDistance = 3.f;
-	if (Elite::Distance(agentInfo.Position, m_pBB->currentHouseTarget) < houseArriveDistance)
-	{
-		m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
-		m_pBB->hasHouseTarget = false;
-	}
 	return steering;
 }
 #pragma endregion
@@ -179,7 +176,9 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
 {
 	SteeringPlugin_Output steering{};
-
+	m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
+	m_pBB->hasHouseTarget = false;
+	 
 	for (auto const& item : m_pBB->items)
 	{
 		if (item.Type == eItemType::GARBAGE)
@@ -214,33 +213,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
 		return steering;
 	}
 
-	if (!m_HouseItems.empty() && m_pBB->freeSlot >= 0)
-	{
-		ItemInfo item = m_HouseItems.front();
-		if (Elite::Distance(m_pBB->agent.Position, item.Location) < m_pBB->agent.GrabRange)
-		{
-			if (m_pInterface->GrabItem(item))
-			{
-				if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
-				{
-					if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
-						m_pBB->inventory[m_pBB->freeSlot] = item;
-					m_HouseItems.erase(m_HouseItems.begin());
-					m_pBB->freeSlot = -1;
-				}
-			}
-		}
-		else
-		{
-			Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(item.Location);
-			Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
-			steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
-			steering.AutoOrient = true;
-		}
-		return steering;
-	}
-
-	if (m_pBB->agent.IsInHouse)
+	if (m_pBB->agent.IsInHouse) 
 	{
 		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_HouseExitTarget);
 		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
@@ -400,30 +373,46 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 {
 	SteeringPlugin_Output steering{};
-	if (m_pBB->items.empty() || m_pBB->freeSlot < 0)
+	if (m_pBB->freeSlot < 0)
 		return steering;
 
-	//FIND CLOSEST NON GARBAGE ITEM
-	const ItemInfo* closest = nullptr;
-	float bestDist = FLT_MAX;
-	for (auto const& i : m_pBB->items)
+	ItemInfo target{};
+	bool hasTarget = false;
+
+	if (!m_HouseItems.empty())
 	{
-		if (i.Type == eItemType::GARBAGE)
-			continue;
-		float d = (i.Location - m_pBB->agent.Position).MagnitudeSquared();
-		if (d < bestDist)
+		target = m_HouseItems.front();
+		hasTarget = true;
+	}
+	else
+	{
+		const ItemInfo* closest = nullptr;
+		float bestDist = FLT_MAX;
+		for (auto const& i : m_pBB->items)
 		{
-			bestDist = d;
-			closest = &i;
+			if (i.Type == eItemType::GARBAGE)
+				continue;
+			float d = (i.Location - m_pBB->agent.Position).MagnitudeSquared();
+			if (d < bestDist)
+			{
+				bestDist = d;
+				closest = &i;
+			}
+		}
+		if (closest)
+		{
+			target = *closest;
+			hasTarget = true;
 		}
 	}
 
-	if (!closest)
-		return steering; 
+	if (!hasTarget)
+		return steering;
 
-	if (bestDist < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
+	float distSqr = (target.Location - m_pBB->agent.Position).MagnitudeSquared();
+	if (distSqr < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
 	{
-		ItemInfo item = *closest;
+		ItemInfo item = target;
 		if (m_pInterface->GrabItem(item))
 		{
 			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
@@ -431,14 +420,17 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 				if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
 				{
 					m_pBB->inventory[m_pBB->freeSlot] = item;
-					m_pBB->freeSlot = -1; 
+					m_pBB->freeSlot = -1;
+
+					if (!m_HouseItems.empty() && (m_HouseItems.front().Location - target.Location).MagnitudeSquared() < 0.01f)
+						m_HouseItems.erase(m_HouseItems.begin());
 				}
 			}
-		}
+		} 
 	}
 	else
 	{
-		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(closest->Location);
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(target.Location);
 		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
@@ -602,6 +594,9 @@ void FiniteStateMachine::UpdateInventoryInfo()
 	 
 	bool hasNonGarbage = std::any_of(m_pBB->items.begin(), m_pBB->items.end(),
 		[](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
+	if (!hasNonGarbage && m_HouseExplorationComplete) 
+		hasNonGarbage = std::any_of(m_HouseItems.begin(), m_HouseItems.end(),
+			[](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
 	m_pBB->hasNonGarbage = hasNonGarbage;
 }
 
@@ -618,6 +613,14 @@ void FiniteStateMachine::UpdateHouseMemory()
 			}
 		if (!seen)
 			m_pBB->knownHouseCenters.push_back(h.Center);
+	}
+	if (!m_pBB->agent.IsInHouse)
+	{ 
+		m_IsExploringHouse = false;
+		m_HouseExploreTargets.clear();
+		m_HouseItems.clear();
+		m_CurrentHouseExploreIndex = 0;
+		m_HouseExplorationComplete = false;
 	}
 }
 

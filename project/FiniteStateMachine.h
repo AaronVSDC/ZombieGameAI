@@ -31,6 +31,7 @@ class FiniteStateMachine
 	std::vector<ItemInfo> m_HouseItems;
 	Elite::Vector2 m_HouseExitTarget{};
 	bool m_HouseExplorationComplete = false;
+	bool m_IsExploringHouse = false; 
 
 	void OnEnter(); 
 	void OnExit(); 
