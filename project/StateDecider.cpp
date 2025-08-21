@@ -11,17 +11,25 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         m_TotalTime = 0.f;
         if (bb->hasWeapon && bb->weaponAmmo > 0)
         {
-            bb->attackLatched = true; 
+            bb->attackLatched = true;
             return AgentState::Attack;
         }
-        return AgentState::EvadeEnemy;
-    } 
+        return AgentState::EvadeEnemy; 
+    }
 
     if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->attackLatched)
         return AgentState::Attack;
 
     if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
         return AgentState::EvadeEnemy;
+
+    for (auto const& item : bb->inventory)
+    {
+        if (item.Type == eItemType::MEDKIT && bb->agent.Health <= 10.f - item.Value)
+            return AgentState::UseItem;
+        if (item.Type == eItemType::FOOD && bb->agent.Energy <= 10.f - item.Value)
+            return AgentState::UseItem;
+    }
 
     if (bb->hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;
@@ -33,6 +41,7 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
         return AgentState::GoToHouse;
 
     return AgentState::Explore;
+
 
 
 }

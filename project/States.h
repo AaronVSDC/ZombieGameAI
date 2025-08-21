@@ -5,5 +5,6 @@ enum class AgentState
 	GoToHouse, 
 	EvadeEnemy, 
 	Attack, 
-	PickupLoot
+	PickupLoot,
+	UseItem
 };

@@ -78,6 +78,11 @@ void FiniteStateMachine::OnEnter()
 		std::cout << "PickupLoot" << std::endl;
 		break;
 	}
+	case AgentState::UseItem:
+	{ 
+		std::cout << "UseItem" << std::endl;
+		break;
+	}
 	}
 }
 
@@ -317,8 +322,8 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 			{
 				if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
 				{
-					m_pBB->inventory[m_pBB->freeSlot] = item.Type;
-					m_pBB->freeSlot = -1;
+					m_pBB->inventory[m_pBB->freeSlot] = item;
+					m_pBB->freeSlot = -1; 
 				}
 			}
 		}
@@ -333,6 +338,46 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 	return steering;
 }
 #pragma endregion
+
+#pragma region USE_ITEM
+SteeringPlugin_Output FiniteStateMachine::UseItem(float /*dt*/)
+{
+	SteeringPlugin_Output steering{};
+
+	const float maxStat{ 10.f };
+	const int invCap = static_cast<int>(m_pBB->inventory.size());
+	for (int i = 0; i < invCap; ++i)
+	{
+		ItemInfo& item = m_pBB->inventory[i];
+		if (item.Type == eItemType::MEDKIT)
+		{
+			float threshold = maxStat - static_cast<float>(item.Value);
+			if (m_pBB->agent.Health <= threshold)
+			{
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+				item = { eItemType::GARBAGE };
+				m_pBB->freeSlot = i;
+				break;
+			}
+		}
+		else if (item.Type == eItemType::FOOD)
+		{
+			float threshold = maxStat - static_cast<float>(item.Value);
+			if (m_pBB->agent.Energy <= threshold)
+			{
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+				item = { eItemType::GARBAGE };
+				m_pBB->freeSlot = i;
+				break;
+			}
+		}
+	}
+	return steering;
+}
+#pragma endregion
+
 
 #pragma region HELPER
 void FiniteStateMachine::PopulateBlackboard()
@@ -385,6 +430,11 @@ SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 		return PickupLoot(dt);
 		break;
 	}
+	case AgentState::UseItem:
+	{
+		return UseItem(dt);
+		break;
+	}
 	}
 	return SteeringPlugin_Output();
 
@@ -402,77 +452,44 @@ void FiniteStateMachine::UpdateInventoryInfo()
 
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
 	if (m_pBB->inventory.size() != static_cast<size_t>(invCap))
-		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
+		m_pBB->inventory.assign(invCap, ItemInfo{ eItemType::GARBAGE });
 
 	for (int i = 0; i < invCap; ++i)
 	{
-		if (m_pBB->inventory[i] != eItemType::GARBAGE)
+		ItemInfo invItem{};
+
+		if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
 		{
-			ItemInfo invItem{};
+			m_pBB->inventory[i] = invItem;
 
-			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
+			if (invItem.Value == 0)
 			{
-				m_pBB->inventory[i] = invItem.Type;
-
-				if (invItem.Value == 0)
-				{
-					m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
-					m_pBB->inventory[i] = eItemType::GARBAGE;
-				}
-
-				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
-				{
-
-					if (m_pBB->weaponSlot == -1)
-					{
-						m_pBB->hasWeapon = true;
-						m_pBB->weaponSlot = i;
-						m_pBB->weaponAmmo = invItem.Value;
-					}
-				}
+				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+				m_pBB->inventory[i] = { eItemType::GARBAGE };
 			}
-			else
+
+			if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
 			{
-				m_pBB->inventory[i] = eItemType::GARBAGE;
+				if (m_pBB->weaponSlot == -1)
+				{
+					m_pBB->hasWeapon = true;
+					m_pBB->weaponSlot = i;
+					m_pBB->weaponAmmo = invItem.Value;
+				}
 			}
 		}
+		else
+		{
+			m_pBB->inventory[i] = { eItemType::GARBAGE };
+		}
 
-		if (m_pBB->inventory[i] == eItemType::GARBAGE && m_pBB->freeSlot == -1)
+		if (m_pBB->inventory[i].Type == eItemType::GARBAGE && m_pBB->freeSlot == -1)
 			m_pBB->freeSlot = i;
 	}
-
+	 
 	bool hasNonGarbage = std::any_of(m_pBB->items.begin(), m_pBB->items.end(),
 		[](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
 	m_pBB->hasNonGarbage = hasNonGarbage;
-
-
-
-	//TODO: MOVE INTO SEPERATE USE ITEM STATE 
-	constexpr float lowThreshold{ 5.f };
-	if (m_pBB->agent.Energy < lowThreshold)
-	{
-		for (int i = 0; i < invCap; ++i)
-		{
-			if (m_pBB->inventory[i] == eItemType::FOOD)
-			{
-				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
-				m_pBB->inventory[i] = eItemType::GARBAGE;
-				break;
-			}
-		}
-	}
-	if (m_pBB->agent.Health < lowThreshold)
-	{
-		for (int i = 0; i < invCap; ++i)
-		{
-			if (m_pBB->inventory[i] == eItemType::MEDKIT)
-			{
-				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
-				m_pBB->inventory[i] = eItemType::GARBAGE;
-				break;
-			}
-		}
-	}
 }
 
 void FiniteStateMachine::UpdateHouseMemory()
@@ -490,4 +507,5 @@ void FiniteStateMachine::UpdateHouseMemory()
 			m_pBB->knownHouseCenters.push_back(h.Center);
 	}
 }
+
 #pragma endregion
