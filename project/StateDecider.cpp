@@ -21,7 +21,7 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
     } 
 
     // Keep attacking as long as we still have a valid target and ammo
-    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && (bb->attackLatched || bb->lastEnemyValid))
+    if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->attackLatched)
         return AgentState::Attack;
 
     // Continue evading for a short period after losing sight of the enemy
