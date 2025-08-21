@@ -346,10 +346,7 @@ void FiniteStateMachine::PopulateBlackboard()
 		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
 		m_pBB->lastEnemyValid = true;
 	}
-	else
-	{
-		m_pBB->lastEnemyValid = false;
-	}
+
 	m_pBB->hasWeapon = false;
 	m_pBB->weaponSlot = -1;
 	m_pBB->weaponAmmo = 0;
