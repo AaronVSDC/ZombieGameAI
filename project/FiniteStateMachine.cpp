@@ -255,14 +255,18 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
-		if (m_pBB->agent.Stamina >= 9.85)
+		if (m_WantsToRun)
 		{
-			steering.RunMode = true;
+			if (m_pBB->agent.Stamina <= 0.1f)
+				m_WantsToRun = false;   
 		}
 		else
 		{
-			steering.RunMode = false; 
+			if (m_pBB->agent.Stamina >= 9.9f)
+				m_WantsToRun = true;    
 		}
+
+		steering.RunMode = m_WantsToRun;
 	}
 	return steering;
 }
@@ -399,6 +403,32 @@ void FiniteStateMachine::PopulateBlackboard()
 			else
 			{
 				m_pBB->inventory[i] = eItemType::GARBAGE;
+			}
+		}
+
+		constexpr float lowThreshold{ 1.f };
+		if (m_pBB->agent.Energy < lowThreshold)
+		{
+			for (int i = 0; i < invCap; ++i)
+			{
+				if (m_pBB->inventory[i] == eItemType::FOOD)
+				{
+					m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+					m_pBB->inventory[i] = eItemType::GARBAGE;
+					break;
+				}
+			}
+		}
+		if (m_pBB->agent.Health < lowThreshold)
+		{
+			for (int i = 0; i < invCap; ++i)
+			{
+				if (m_pBB->inventory[i] == eItemType::MEDKIT)
+				{
+					m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+					m_pBB->inventory[i] = eItemType::GARBAGE;
+					break;
+				}
 			}
 		}
 

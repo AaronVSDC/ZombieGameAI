@@ -21,7 +21,9 @@ class FiniteStateMachine
 	float m_FrontierWanderTimer = 0.f;
 	const float m_FrontierWanderDuration = 5.f;
 
-	float m_SearchRotationAccumulation = 0.f; 
+	float m_SearchRotationAccumulation = 0.f;
+
+	bool m_WantsToRun = false; 
 
 	void OnEnter(); 
 	void OnExit(); 
