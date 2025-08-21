@@ -3,13 +3,9 @@
 
 AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
 {
-    // Keep track of time since last direct enemy interaction
     m_TotalTime += dt;
-
-    //ENEMY HANDLING HAS PRIORITY
     if (!bb->enemies.empty() || bb->agent.Bitten)
     {
-        // reset timer whenever a threat is detected
         m_TotalTime = 0.f;
 
         if (bb->hasWeapon && bb->weaponAmmo > 0)
@@ -17,29 +13,27 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
             bb->attackLatched = true; 
             return AgentState::Attack;
         }
-        return AgentState::EvadeEnemy;
     } 
 
-    // Keep attacking as long as we still have a valid target and ammo
     if (current == AgentState::Attack && bb->hasWeapon && bb->weaponAmmo > 0 && bb->attackLatched)
         return AgentState::Attack;
 
-    // Continue evading for a short period after losing sight of the enemy
-    if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
-        return AgentState::EvadeEnemy;
 
-    //ITEM HANDLING WHEN THERE IS FREE SPACE
     bool hasNonGarbage = std::any_of(bb->items.begin(), bb->items.end(),
         [](const ItemInfo& item) { return item.Type != eItemType::GARBAGE; });
     if (hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;
 
-    //CONTINUE GOING TO HOUSE TARGET IF IS SET
     if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)
         return AgentState::GoToHouse;
 
     if (SelectNextHouse(bb))
         return AgentState::GoToHouse;
+
+    if (!bb->hasWeapon && bb->weaponAmmo > 0) current = AgentState::EvadeEnemy;
+
+    if (current == AgentState::EvadeEnemy && m_TotalTime < m_EvadeDuration)
+        return AgentState::EvadeEnemy;
 
     return AgentState::Explore;
 

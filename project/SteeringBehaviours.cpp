@@ -40,24 +40,28 @@ Elite::Vector2 SteeringBehaviour::Evade(const AgentInfo& agentInfo, const Elite:
     return away;
 }
 
-Elite::Vector2 SteeringBehaviour::Wander(const AgentInfo& agentInfo, float wanderRadius)
+Elite::Vector2 SteeringBehaviour::Wander(const AgentInfo& agentInfo, float wanderRadius, float jitterMultiplier)
 {
-    Elite::Vector2 randomDisp = { Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f,
-                                Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f };
+    float jitter = m_WanderJitter * jitterMultiplier;
+    Elite::Vector2 randomDisp = { Elite::randomFloat() * jitter - jitter * 0.5f,
+                                 Elite::randomFloat() * jitter - jitter * 0.5f };
     m_WanderTarget += randomDisp;
-    m_WanderTarget.Normalize();
-    m_WanderTarget *= wanderRadius;
+    if (jitterMultiplier <= 0.f)
+        m_WanderTarget = { 0.f, 0.f };
+    else
+    {
+        m_WanderTarget.Normalize(); 
+        m_WanderTarget *= wanderRadius;
+    }
 
     Elite::Vector2 forward = { cosf(agentInfo.Orientation), sinf(agentInfo.Orientation) };
     Elite::Vector2 circleCenter = agentInfo.Position + forward * m_WanderOffset;
     Elite::Vector2 worldTarget = circleCenter + m_WanderTarget;
 
-    // Step 3: Seek that world target at full speed
     Elite::Vector2 desired = worldTarget - agentInfo.Position;
     desired.Normalize();
     return desired;
 }
-
 
 
 

@@ -98,8 +98,8 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	if (m_FrontierWanderTimer > 0.f)
 	{
 		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f) * m_pBB->agent.MaxLinearSpeed;
-		steering.AutoOrient = true; 
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f, 0.f) * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
 		if (m_FrontierWanderTimer <= 0.f)
 			m_Target = m_pGrid->GetNextFrontierTarget();
 		return steering;
