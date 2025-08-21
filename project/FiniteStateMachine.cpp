@@ -105,7 +105,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	if (m_FrontierWanderTimer > 0.f)
 	{
 		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f, 0.f) * m_pBB->agent.MaxLinearSpeed;
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f, .8f) * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
 		if (m_FrontierWanderTimer <= 0.f)
 			m_Target = m_pGrid->GetNextFrontierTarget();
@@ -129,18 +129,9 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	const Elite::Vector2 currentWaypoint =
 		m_pInterface->NavMesh_GetClosestPathPoint(m_pBB->currentHouseTarget);
 
-	constexpr float waypointArriveRadius = 1.5f;
-	const float distToWP2 = (currentWaypoint - agentInfo.Position).MagnitudeSquared();
-	if (distToWP2 < waypointArriveRadius * waypointArriveRadius)
-	{
-		steering.LinearVelocity = Elite::ZeroVector2;
-	}
-	else
-	{
-		Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
-		steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
-	}
-	steering.AutoOrient = true;
+	Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
+	steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
+	steering.AutoOrient = true; 
 
 	constexpr float houseArriveDistance = 3.f;
 	if (Elite::Distance(agentInfo.Position, m_pBB->currentHouseTarget) < houseArriveDistance)

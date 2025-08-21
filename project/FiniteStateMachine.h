@@ -19,7 +19,7 @@ class FiniteStateMachine
 	bool m_HasEnteredFirstState = false;
 
 	float m_FrontierWanderTimer = 0.f;
-	const float m_FrontierWanderDuration = 12.f;
+	const float m_FrontierWanderDuration = 9.f;
 
 	float m_SearchRotationAccumulation = 0.f;
 
