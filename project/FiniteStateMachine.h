@@ -19,7 +19,7 @@ class FiniteStateMachine
 	bool m_HasEnteredFirstState = false;
 
 	float m_FrontierWanderTimer = 0.f;
-	const float m_FrontierWanderDuration = 5.f;
+	const float m_FrontierWanderDuration = 12.f;
 
 	float m_SearchRotationAccumulation = 0.f;
 
@@ -49,6 +49,10 @@ public:
 	void PopulateBlackboard();
 	void InitAndUpdateGrid(); 
 	SteeringPlugin_Output UpdateStates(float dt);
+
+	void UpdateInventoryInfo();
+
+	void UpdateHouseMemory();
 
 
 

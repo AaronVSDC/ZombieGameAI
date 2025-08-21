@@ -98,7 +98,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	if (m_FrontierWanderTimer > 0.f)
 	{
 		m_FrontierWanderTimer -= dt;
-		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent) * m_pBB->agent.MaxLinearSpeed;
+		steering.LinearVelocity = m_pSteeringBehaviour->Wander(m_pBB->agent, 2.f) * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true; 
 		if (m_FrontierWanderTimer <= 0.f)
 			m_Target = m_pGrid->GetNextFrontierTarget();
@@ -229,9 +229,18 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 	if (closest)
 	{
-		// Remember enemy in case it leaves the FOV next frame 
+		// Remember enemy in case it leaves the FOV next frame
 		m_pBB->lastEnemy = *closest;
 		m_pBB->lastEnemyValid = true;
+	}
+	else if (m_pBB->agent.WasBitten) 
+	{
+		float angle = m_pBB->agent.Orientation;
+		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
+		m_pBB->lastEnemy.Location = m_pBB->agent.Position - forward;
+		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
+		m_pBB->lastEnemyValid = true;
+		closest = &m_pBB->lastEnemy;
 	}
 	else if (m_pBB->lastEnemyValid)
 	{
@@ -304,10 +313,10 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 		{
 			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
 			{
-				//Track added item so we do not try to use the same slot again
 				if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
 				{
 					m_pBB->inventory[m_pBB->freeSlot] = item.Type;
+					m_pBB->freeSlot = -1;
 				}
 			}
 		}
@@ -333,120 +342,7 @@ void FiniteStateMachine::PopulateBlackboard()
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
 	m_pBB->items = m_pInterface->GetItemsInFOV();
 	m_pBB->houses = m_pInterface->GetHousesInFOV();
-	m_pBB->worldInfo = m_pInterface->World_GetInfo();
-
-	// Remember last seen enemy or estimate a position behind the agent if damaged
-	if (!m_pBB->enemies.empty())
-	{
-		const EnemyInfo* closest = nullptr;
-		float bestDist = FLT_MAX;
-		for (auto const& e : m_pBB->enemies)
-		{
-			float d = (e.Location - m_pBB->agent.Position).MagnitudeSquared();
-			if (d < bestDist)
-			{
-				bestDist = d;
-				closest = &e;
-			}
-		}
-		if (closest)
-		{
-			m_pBB->lastEnemy = *closest;
-			m_pBB->lastEnemyValid = true;
-		}
-	}
-	else if (m_pBB->agent.WasBitten)
-	{
-		float angle = m_pBB->agent.Orientation;
-		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
-		m_pBB->lastEnemy.Location = m_pBB->agent.Position - forward;
-		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
-		m_pBB->lastEnemyValid = true;
-	}
-
-	m_pBB->hasWeapon = false;
-	m_pBB->weaponSlot = -1;
-	m_pBB->weaponAmmo = 0;
-	m_pBB->freeSlot = -1;
-	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
-
-	if (m_pBB->inventory.size() != static_cast<size_t>(invCap))
-		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
-
-	//Only query slots that we believe contain an item
-	for (int i = 0; i < invCap; ++i)
-	{
-		if (m_pBB->inventory[i] != eItemType::GARBAGE)
-		{
-			ItemInfo invItem{};
-			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
-			{
-				m_pBB->inventory[i] = invItem.Type;
-
-				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
-				{
-					if (invItem.Value == 0)
-					{
-						// discard empty weapon
-						m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
-						m_pBB->inventory[i] = eItemType::GARBAGE;
-					}
-					else if (m_pBB->weaponSlot == -1)
-					{
-						// select the first weapon with ammo 
-						m_pBB->hasWeapon = true;
-						m_pBB->weaponSlot = i;
-						m_pBB->weaponAmmo = invItem.Value;
-					}
-				}
-			}
-			else
-			{
-				m_pBB->inventory[i] = eItemType::GARBAGE;
-			}
-		}
-
-		constexpr float lowThreshold{ 1.f };
-		if (m_pBB->agent.Energy < lowThreshold)
-		{
-			for (int i = 0; i < invCap; ++i)
-			{
-				if (m_pBB->inventory[i] == eItemType::FOOD)
-				{
-					m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
-					m_pBB->inventory[i] = eItemType::GARBAGE;
-					break;
-				}
-			}
-		}
-		if (m_pBB->agent.Health < lowThreshold)
-		{
-			for (int i = 0; i < invCap; ++i)
-			{
-				if (m_pBB->inventory[i] == eItemType::MEDKIT)
-				{
-					m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
-					m_pBB->inventory[i] = eItemType::GARBAGE;
-					break;
-				}
-			}
-		}
-
-		if (m_pBB->inventory[i] == eItemType::GARBAGE && m_pBB->freeSlot == -1)
-			m_pBB->freeSlot = i;
-	}
-	for (auto const& h : m_pBB->houses)
-	{
-		bool seen = false;
-		for (auto const& known : m_pBB->knownHouseCenters)
-			if ((known - h.Center).MagnitudeSquared() < 0.01f)
-			{
-				seen = true;
-				break;
-			}
-		if (!seen)
-			m_pBB->knownHouseCenters.push_back(h.Center);
-	}
+	m_pBB->worldInfo = m_pInterface->World_GetInfo(); 
 }
 void FiniteStateMachine::InitAndUpdateGrid()
 {
@@ -457,7 +353,8 @@ void FiniteStateMachine::InitAndUpdateGrid()
 }
 SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 {
-
+	UpdateInventoryInfo();
+	UpdateHouseMemory(); 
 
 	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get(), dt);
 	if (next != m_CurrentState)
@@ -494,5 +391,98 @@ SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
 	return SteeringPlugin_Output();
 
 
+}
+
+
+
+void FiniteStateMachine::UpdateInventoryInfo()
+{
+	m_pBB->hasWeapon = false;
+	m_pBB->weaponSlot = -1;
+	m_pBB->weaponAmmo = 0;
+	m_pBB->freeSlot = -1;
+
+	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
+	if (m_pBB->inventory.size() != static_cast<size_t>(invCap))
+		m_pBB->inventory.assign(invCap, eItemType::GARBAGE);
+
+	for (int i = 0; i < invCap; ++i)
+	{
+		if (m_pBB->inventory[i] != eItemType::GARBAGE)
+		{
+			ItemInfo invItem{};
+
+			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
+			{
+				m_pBB->inventory[i] = invItem.Type;
+
+				if (invItem.Value == 0)
+				{
+					m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+					m_pBB->inventory[i] = eItemType::GARBAGE;
+				}
+
+				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
+				{
+
+					if (m_pBB->weaponSlot == -1)
+					{
+						m_pBB->hasWeapon = true;
+						m_pBB->weaponSlot = i;
+						m_pBB->weaponAmmo = invItem.Value;
+					}
+				}
+			}
+			else
+			{
+				m_pBB->inventory[i] = eItemType::GARBAGE;
+			}
+		}
+
+		if (m_pBB->inventory[i] == eItemType::GARBAGE && m_pBB->freeSlot == -1)
+			m_pBB->freeSlot = i;
+	}
+
+	constexpr float lowThreshold{ 5.f };
+	if (m_pBB->agent.Energy < lowThreshold)
+	{
+		for (int i = 0; i < invCap; ++i)
+		{
+			if (m_pBB->inventory[i] == eItemType::FOOD)
+			{
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+				m_pBB->inventory[i] = eItemType::GARBAGE;
+				break;
+			}
+		}
+	}
+	if (m_pBB->agent.Health < lowThreshold)
+	{
+		for (int i = 0; i < invCap; ++i)
+		{
+			if (m_pBB->inventory[i] == eItemType::MEDKIT)
+			{
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(i));
+				m_pBB->inventory[i] = eItemType::GARBAGE;
+				break;
+			}
+		}
+	}
+}
+
+void FiniteStateMachine::UpdateHouseMemory()
+{
+	for (auto const& h : m_pBB->houses)
+	{
+		bool seen = false;
+		for (auto const& known : m_pBB->knownHouseCenters)
+			if ((known - h.Center).MagnitudeSquared() < 0.01f)
+			{
+				seen = true;
+				break;
+			}
+		if (!seen)
+			m_pBB->knownHouseCenters.push_back(h.Center);
+	}
 }
 #pragma endregion

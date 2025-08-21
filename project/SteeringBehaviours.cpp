@@ -40,13 +40,13 @@ Elite::Vector2 SteeringBehaviour::Evade(const AgentInfo& agentInfo, const Elite:
     return away;
 }
 
-Elite::Vector2 SteeringBehaviour::Wander(const AgentInfo& agentInfo)
+Elite::Vector2 SteeringBehaviour::Wander(const AgentInfo& agentInfo, float wanderRadius)
 {
     Elite::Vector2 randomDisp = { Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f,
                                 Elite::randomFloat() * m_WanderJitter - m_WanderJitter * 0.5f };
     m_WanderTarget += randomDisp;
     m_WanderTarget.Normalize();
-    m_WanderTarget *= m_WanderRadius;
+    m_WanderTarget *= wanderRadius;
 
     Elite::Vector2 forward = { cosf(agentInfo.Orientation), sinf(agentInfo.Orientation) };
     Elite::Vector2 circleCenter = agentInfo.Position + forward * m_WanderOffset;
