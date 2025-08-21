@@ -7,7 +7,7 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
     m_TotalTime += dt;
 
     //ENEMY HANDLING HAS PRIORITY
-    if (!bb->enemies.empty() || bb->tookDamage)
+    if (!bb->enemies.empty() || bb->agent.Bitten)
     {
         // reset timer whenever a threat is detected
         m_TotalTime = 0.f;

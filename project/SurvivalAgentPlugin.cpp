@@ -34,10 +34,10 @@ void SurvivalAgentPlugin::DllShutdown()
 
 void SurvivalAgentPlugin::InitGameDebugParams(GameDebugParams& params)
 {
-	//params.AutoFollowCam = true; //Automatically follow the AI? (Default = true)
-	//params.RenderUI = true; //Render the IMGUI Panel? (Default = true)
-	//params.SpawnEnemies = true; //Do you want to spawn enemies? (Default = true)
-	//params.EnemyCount = 20; //How many enemies? (Default = 20)
+	params.AutoFollowCam = true; //Automatically follow the AI? (Default = true)
+	params.RenderUI = true; //Render the IMGUI Panel? (Default = true)
+	params.SpawnEnemies = true; //Do you want to spawn enemies? (Default = true)
+	params.EnemyCount = 50; //How many enemies? (Default = 20)
 	//params.GodMode = false; //GodMode > You can't die, can be useful to inspect certain behaviors (Default = false)
 	//params.LevelFile = "GameLevel.gppl";
 	//params.AutoGrabClosestItem = true; //A call to Item_Grab(...) returns the closest item that can be grabbed. (EntityInfo argument is ignored)
@@ -45,9 +45,9 @@ void SurvivalAgentPlugin::InitGameDebugParams(GameDebugParams& params)
 	//params.InfiniteStamina = false;
 	//params.SpawnDebugPistol = true;
 	//params.SpawnDebugShotgun = true;
-	//params.SpawnPurgeZonesOnMiddleClick = true;
-	//params.PrintDebugMessages = true;
-	//params.ShowDebugItemNames = true;
+	params.SpawnPurgeZonesOnMiddleClick = true;
+	params.PrintDebugMessages = true;
+	params.ShowDebugItemNames = true;
 	params.Seed = int(time(nullptr)); //-1 = don't set seed. Any other number = fixed seed //TIP: use Seed = int(time(nullptr)) for pure randomness
 }
 

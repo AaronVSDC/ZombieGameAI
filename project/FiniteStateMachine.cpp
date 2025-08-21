@@ -159,15 +159,13 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		if (d < bestDist) { bestDist = d; closest = &e; }
 	}
 
-	// stand still
-	steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
 	steering.AutoOrient = false;
+	steering.LinearVelocity = -m_pBB->agent.LinearVelocity;
 
 	if (closest)
 	{
 		// we have a target
 		m_pBB->lastEnemy = *closest;
-		m_pBB->lastEnemyValid = true;
 
 		Elite::Vector2 toEnemy = closest->Location - m_pBB->agent.Position;
 		float desiredOrientation = atan2f(toEnemy.y, toEnemy.x);
@@ -187,16 +185,13 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 			if (m_pBB->weaponSlot >= 0 && m_pBB->weaponAmmo > 0)
 			{
 				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
-
-				// shot taken -> unlatch and drop target
 				m_pBB->attackLatched = false;
-				m_pBB->lastEnemyValid = false;
 			}
 		}
 	}
 	else
 	{
-	   // No enemy in sight: rotate to search, but DON'T mark lastEnemyValid true here
+	   // No enemy in sight: rotate to search
 		const float omega = m_pBB->agent.MaxAngularSpeed;
 		steering.AngularVelocity = omega;
 
@@ -205,7 +200,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		if (m_SearchRotationAccumulation >= Elite::ToRadians(360.f))
 		{
 			m_pBB->attackLatched = false;
-			m_SearchRotationAccumulation = 0.f; // ready for next time
+			m_SearchRotationAccumulation = 0.f; 
 		}
 	}
 
@@ -231,21 +226,38 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 		}
 	}
 
-	if (closest)
+	if (m_pBB->agent.WasBitten)
 	{
-		// Remember enemy in case it leaves the FOV next frame 
-		m_pBB->lastEnemy = *closest;
-		m_pBB->lastEnemyValid = true;
-	}
-	else if (m_pBB->lastEnemyValid)
-	{
-		closest = &m_pBB->lastEnemy;
+		Elite::Vector2 fleeDir = m_pBB->agent.LinearVelocity; 
+
+		// Move far enough away from the threat
+		constexpr float fleeTargetDistance = 25.f;
+		Elite::Vector2 fleeTarget = m_pBB->agent.Position + fleeDir * fleeTargetDistance;
+
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(fleeTarget);
+		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+
+		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
+		steering.AutoOrient = true;
+		steering.RunMode = true;
 	}
 
 	if (closest)
 	{
-		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Evade(m_pBB->agent, closest->Location, closest->LinearVelocity);
-		steering.LinearVelocity = fleeDir * m_pBB->agent.MaxLinearSpeed;
+		// Calculate a target position in the opposite direction of the threat and
+		// seek that position using the navmesh. This prevents the agent from
+		// continuously pushing against obstacles when evading. 
+		Elite::Vector2 fleeDir = m_pSteeringBehaviour->Evade(
+			m_pBB->agent, closest->Location, closest->LinearVelocity);
+
+		// Move far enough away from the threat
+		constexpr float fleeTargetDistance = 25.f;
+		Elite::Vector2 fleeTarget = m_pBB->agent.Position + fleeDir * fleeTargetDistance;
+
+		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(fleeTarget);
+		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+
+		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
 		steering.RunMode = true;
 	}
@@ -309,8 +321,6 @@ void FiniteStateMachine::PopulateBlackboard()
 {
 	m_pBB->agent = m_pInterface->Agent_GetInfo();
 
-	// Track health changes so we can react when hit from outside the FOV
-	m_pBB->tookDamage = (m_pBB->agent.Health < m_pBB->lastHealth);
 	m_pBB->lastHealth = m_pBB->agent.Health;
 
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
@@ -332,19 +342,13 @@ void FiniteStateMachine::PopulateBlackboard()
 				closest = &e;
 			}
 		}
-		if (closest)
-		{
-			m_pBB->lastEnemy = *closest;
-			m_pBB->lastEnemyValid = true;
-		}
 	}
-	else if (m_pBB->tookDamage)
+	else if (m_pBB->agent.Bitten)
 	{
 		float angle = m_pBB->agent.Orientation;
 		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
 		m_pBB->lastEnemy.Location = m_pBB->agent.Position - forward;
 		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
-		m_pBB->lastEnemyValid = true;
 	}
 
 	m_pBB->hasWeapon = false;
@@ -368,13 +372,10 @@ void FiniteStateMachine::PopulateBlackboard()
 
 				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
 				{
-					if (m_pBB->weaponSlot == -1)
+					m_pBB->hasWeapon = true;
+					if (invItem.Value <= m_pBB->weaponAmmo)
 					{
-						m_pBB->hasWeapon = true;
 						m_pBB->weaponSlot = i;
-					}
-					if (i == m_pBB->weaponSlot)
-					{
 						m_pBB->weaponAmmo = invItem.Value;
 					}
 				}
