@@ -150,6 +150,9 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 {
 	SteeringPlugin_Output steering{};
 
+	if (IsPointInPurgeZone(m_Target))
+		SetNextExploreTarget();
+
 	const float arriveDist = m_pGrid->GetCellSize() * 0.5f;
 	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveDist)
 	{
@@ -162,14 +165,14 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 			GenerateRadialTargets();
 		}
 		SetNextExploreTarget();
-	}
+	} 
 
 	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
 	Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 	steering.AutoOrient = true;
 	steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 	EnableSprint(steering);
-	return steering; 
+	return steering;
 }
 void FiniteStateMachine::SetNextExploreTarget()
 {
@@ -259,6 +262,13 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadePurgeZone(float /*dt*/)
 SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 {
 	SteeringPlugin_Output steering{};
+
+	if (IsPointInPurgeZone(m_pBB->currentHouseTarget))
+	{
+		m_pBB->hasHouseTarget = false;
+		return steering;
+	}
+
 	const auto agentInfo = m_pInterface->Agent_GetInfo();
 
 	const Elite::Vector2 currentWaypoint =
