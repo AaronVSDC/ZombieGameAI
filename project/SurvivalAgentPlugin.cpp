@@ -10,7 +10,7 @@ void SurvivalAgentPlugin::Initialize(IBaseInterface* pInterface, PluginInfo& inf
 	m_pInterface = static_cast<IExamInterface*>(pInterface);
 
 	info.BotName = "mrHeylen";
-	info.Student_Name = "Aaron_Van_Sichem_De_Combe"; 
+	info.Student_Name = "AaronVanSichemDeC";  
 	info.Student_Class = "2DAE19";
 	info.LB_Password = "WalterWhite";
 

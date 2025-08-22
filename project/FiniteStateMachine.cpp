@@ -608,10 +608,17 @@ int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 		{
 			if (energyLow)
 			{
-				if (slotGun != -1)
-					return slotGun;
-				if (!healthLow && slotMed != -1)
+				// No food while energy is low: swap out the
+				// most abundant item type to make room.
+				if (countGun >= countMed)
+				{
+					if (slotGun != -1)
+						return slotGun;
+				}
+				else if (slotMed != -1)
+				{
 					return slotMed;
+				}
 			}
 		}
 		else if (slotFood != -1 && newItem.Value > lowestFood)
@@ -624,10 +631,17 @@ int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 		{
 			if (healthLow)
 			{
-				if (countFood > 0 && (!energyLow || countFood > 1))
+				// No medkits while health is low: remove the
+				// item type that is most common in the inventory.
+				if (countGun >= countFood)
+				{
+					if (slotGun != -1) 
+						return slotGun;
+				}
+				else if (slotFood != -1)
+				{
 					return slotFood;
-				if (slotGun != -1)
-					return slotGun;
+				}
 			}
 		}
 		else if (slotMed != -1 && newItem.Value > lowestMed)
@@ -872,10 +886,10 @@ void FiniteStateMachine::UpdateHouseMemory()
 			float margin = m_pGrid->GetCellSize() + 15.f; 
 			float offsetX = half.x + margin;
 			float offsetY = half.y + margin;
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ offsetX, 0.f });   // right
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ -offsetX, 0.f });  // left
 			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, offsetY });   // top
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ offsetX, 0.f });   // right
 			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, -offsetY });  // bottom
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ -offsetX, 0.f });  // left
 		
 		}
 	}
