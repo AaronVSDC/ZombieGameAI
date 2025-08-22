@@ -4,7 +4,8 @@ enum class AgentState
     Explore,
     GoToHouse,
     ExploreHouse,
-    EvadeEnemy, 
+    EvadeEnemy,
+    EvadePurgeZone,
     Attack,
     PickupLoot,
     UseItem

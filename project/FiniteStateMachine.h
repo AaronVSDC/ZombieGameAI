@@ -45,8 +45,9 @@ class FiniteStateMachine
 	float m_InitialRadius = 10.f;
 	float m_CurrentRadius = m_InitialRadius;
 	float m_RadiusIncrement = 75.f;
-	float m_MinRadius = 1.f;
-	size_t m_NumRadialTargets = 16; 
+	float m_MinRadius = 1.f; 
+	size_t m_NumRadialTargets = 16;
+	std::deque<Elite::Vector2> m_ExtraExploreTargets{};
 	void GenerateRadialTargets();
 	void SetNextExploreTarget();
 
@@ -58,32 +59,34 @@ class FiniteStateMachine
 	//STATE UPDATES
 	//----------------
 	SteeringPlugin_Output UpdateExplore(float dt);
-	SteeringPlugin_Output UpdateGoToHouse(float dt); 
-	SteeringPlugin_Output UpdateAttack(float dt); 
-	SteeringPlugin_Output UpdateEvadeEnemy(float dt); 
+	SteeringPlugin_Output UpdateGoToHouse(float dt);
+	SteeringPlugin_Output UpdateAttack(float dt);
+	SteeringPlugin_Output UpdateEvadeEnemy(float dt);
+	SteeringPlugin_Output UpdateEvadePurgeZone(float dt);
 	SteeringPlugin_Output PickupLoot(float dt);
-	SteeringPlugin_Output UseItem(float dt); 
+	SteeringPlugin_Output UseItem(float dt);
 	SteeringPlugin_Output UpdateExploreHouse(float dt);
 
 
 
 public: 
 	FiniteStateMachine(IExamInterface* pInterface);
-	~FiniteStateMachine() = default; 
+	~FiniteStateMachine() = default;
 
 	SteeringPlugin_Output Update(float dt);
 
 	void DebugRender()const;
 	void PopulateBlackboard();
-	void InitAndUpdateGrid(); 
+	void UpdatePurgeZoneMemory(float dt);
+	void InitAndUpdateGrid();
 	SteeringPlugin_Output UpdateStates(float dt);
 
 	void UpdateInventoryInfo();
 
 	void UpdateHouseMemory();
 
-	void EnableSprint(SteeringPlugin_Output& steering); 
-
+	void EnableSprint(SteeringPlugin_Output& steering);
+	bool IsPointInPurgeZone(const Elite::Vector2& pos) const;
 
 
 

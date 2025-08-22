@@ -2,6 +2,11 @@
 #include <Exam_HelperStructs.h>
 #include <vector>
 
+struct TrackedPurgeZone
+{
+    PurgeZoneInfo info;
+    float remainingTime = 0.f;
+};
 
 struct Blackboard
 {
@@ -15,14 +20,18 @@ struct Blackboard
     bool                 hasHouseTarget = false;
     bool                 inUnvisitedHouse = false;
     Elite::Vector2       currentHouseTarget{};
-    std::vector<ItemInfo> inventory; 
+    std::vector<ItemInfo> inventory;
     bool                 hasWeapon = false;
     int                  weaponAmmo = 0;
-	int                  weaponSlot = -1;
+    int                  weaponSlot = -1;
     int                  freeSlot = -1;
     EnemyInfo             lastEnemy{};
     bool                  lastEnemyValid = false;
-    bool                  attackLatched = false;   
+    bool                  attackLatched = false;
     float                 lastHealth = 0.f;
-    bool                  hasNonGarbage = false; 
+    bool                  hasNonGarbage = false;
+    bool                  inPurgeZone = false;
+    bool                  needsMedkit = false;
+    bool                  needsFood = false; 
+    std::vector<TrackedPurgeZone> purgeZones;
 };

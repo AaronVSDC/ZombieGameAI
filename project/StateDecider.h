@@ -5,9 +5,6 @@
 class StateDecider
 {
 
-	void SelectState(AgentState& current, Blackboard* bb, float dt);
-
-	bool SelectNextHouse(Blackboard* bb) const; 
 public: 
 	StateDecider() = default; 
 	~StateDecider() = default; 
