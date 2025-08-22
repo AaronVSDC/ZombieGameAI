@@ -94,6 +94,11 @@ void FiniteStateMachine::OnEnter()
 				}
 			}
 
+			// Record this house so we don't explore it again
+			m_pBB->currentHouseTarget = current.Center;
+			m_pBB->visitedHouseCenters.push_back(current.Center);
+			m_pBB->hasHouseTarget = false;
+
 			Elite::Vector2 half = current.Size * 0.5f;
 			Elite::Vector2 offset = half * 0.5f;
 			m_HouseExploreTargets.push_back(current.Center + Elite::Vector2{ -offset.x, -offset.y });
@@ -216,7 +221,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
 {
 	SteeringPlugin_Output steering{};
-	m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
 	m_pBB->hasHouseTarget = false;
 
 	if (!m_HouseExplorationComplete && m_CurrentHouseExploreIndex < m_HouseExploreTargets.size())
@@ -619,15 +623,54 @@ void FiniteStateMachine::UpdateHouseMemory()
 		bool seen = false;
 		for (auto const& known : m_pBB->knownHouseCenters)
 			if ((known - h.Center).MagnitudeSquared() < 0.01f)
-			{
+			{ 
 				seen = true;
 				break;
 			}
 		if (!seen)
 			m_pBB->knownHouseCenters.push_back(h.Center);
 	}
-	if (!m_pBB->agent.IsInHouse)
-	{ 
+	if (m_pBB->agent.IsInHouse)
+	{
+		float bestDistSqr = FLT_MAX;
+		Elite::Vector2 currentCenter{};
+		for (auto const& h : m_pBB->houses)
+		{
+			float d = (h.Center - m_pBB->agent.Position).MagnitudeSquared();
+			if (d < bestDistSqr)
+			{
+				bestDistSqr = d;
+				currentCenter = h.Center;
+			}
+		}
+
+		if (bestDistSqr < FLT_MAX)
+		{
+			bool visited = false;
+			for (auto const& v : m_pBB->visitedHouseCenters)
+			{
+				if ((v - currentCenter).MagnitudeSquared() < 0.1f * 0.1f)
+				{
+					visited = true;
+					break;
+				}
+			}
+
+			m_pBB->inUnvisitedHouse = !visited;
+			if (!visited)
+			{
+				m_pBB->currentHouseTarget = currentCenter;
+				m_pBB->hasHouseTarget = true;
+			}
+			else
+			{
+				m_pBB->hasHouseTarget = false;
+			}
+		}
+	}
+	else
+	{
+		m_pBB->inUnvisitedHouse = false;
 		m_IsExploringHouse = false;
 		m_HouseExploreTargets.clear();
 		m_HouseItems.clear();
