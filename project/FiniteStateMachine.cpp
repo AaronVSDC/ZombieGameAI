@@ -868,12 +868,15 @@ void FiniteStateMachine::UpdateHouseMemory()
 		{
 			m_pBB->knownHouseCenters.push_back(h.Center);
 
-			// explore the surrounding area of the new house
-			float offset = m_pGrid->GetCellSize() * 2.f;
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ offset, 0.f });
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ -offset, 0.f });
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, offset });
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, -offset });
+			Elite::Vector2 half = h.Size * 0.5f;
+			float margin = m_pGrid->GetCellSize() + 15.f; 
+			float offsetX = half.x + margin;
+			float offsetY = half.y + margin;
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ offsetX, 0.f });   // right
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ -offsetX, 0.f });  // left
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, offsetY });   // top
+			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, -offsetY });  // bottom
+		
 		}
 	}
 	if (m_pBB->agent.IsInHouse)
