@@ -145,7 +145,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 		++m_RadialTargetIndex;
 		if (m_RadialTargetIndex >= m_RadialTargets.size())
 		{
-			m_CurrentRadius -= m_RadiusDecrement;
+			m_CurrentRadius += m_RadiusIncrement;
 			if (m_CurrentRadius < m_MinRadius)
 				m_CurrentRadius = m_InitialRadius;
 			GenerateRadialTargets();
