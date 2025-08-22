@@ -87,7 +87,7 @@ public:
 
 	void EnableSprint(SteeringPlugin_Output& steering);
 	bool IsPointInPurgeZone(const Elite::Vector2& pos) const;
-
+	int DetermineReplacementSlot(const ItemInfo& newItem) const; 
 
 
 

@@ -453,8 +453,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 {
 	SteeringPlugin_Output steering{};
-	if (m_pBB->freeSlot < 0)
-		return steering;
 
 	ItemInfo target{};
 	bool hasTarget = false;
@@ -499,17 +497,26 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 	if (IsPointInPurgeZone(target.Location))
 		return steering;
 
+	int slot = m_pBB->freeSlot;
+	if (slot < 0)
+		slot = DetermineReplacementSlot(target);
+	if (slot < 0)
+		return steering;
+
 	float distSqr = (target.Location - m_pBB->agent.Position).MagnitudeSquared();
 	if (distSqr < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
 	{
 		ItemInfo item = target;
 		if (m_pInterface->GrabItem(item))
 		{
-			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(m_pBB->freeSlot), item))
+			if (m_pBB->inventory[slot].Type != eItemType::GARBAGE)
+				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(slot));
+
+			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(slot), item))
 			{
-				if (m_pBB->freeSlot >= 0 && m_pBB->freeSlot < static_cast<int>(m_pBB->inventory.size()))
+				if (slot >= 0 && slot < static_cast<int>(m_pBB->inventory.size()))
 				{
-					m_pBB->inventory[m_pBB->freeSlot] = item;
+					m_pBB->inventory[slot] = item;
 					m_pBB->freeSlot = -1;
 
 					if (!m_HouseItems.empty() && (m_HouseItems.front().Location - target.Location).MagnitudeSquared() < 0.01f)
@@ -518,7 +525,7 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 			}
 		}
 	}
-	else 
+	else
 	{
 		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(target.Location);
 		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
@@ -526,6 +533,101 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 		steering.AutoOrient = true;
 	}
 	return steering;
+}
+
+
+int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
+{
+	const auto& inv = m_pBB->inventory;
+	int slotSameType = -1;
+	int lowestSameValue = INT_MAX; 
+	int slotFood = -1, slotMed = -1, slotGun = -1;
+	int lowestFood = INT_MAX;
+	int lowestMed = INT_MAX;
+	int lowestGun = INT_MAX;
+	int countFood = 0, countMed = 0, countGun = 0;
+
+	for (int i = 0; i < static_cast<int>(inv.size()); ++i)
+	{
+		const ItemInfo& it = inv[i];
+		if (it.Type == newItem.Type)
+		{
+			if (it.Value < lowestSameValue)
+			{
+				lowestSameValue = it.Value;
+				slotSameType = i;
+			}
+		}
+
+		switch (it.Type)
+		{
+		case eItemType::FOOD:
+			++countFood;
+			if (it.Value < lowestFood)
+				lowestFood = it.Value, slotFood = i;
+			break;
+		case eItemType::MEDKIT:
+			++countMed;
+			if (it.Value < lowestMed)
+				lowestMed = it.Value, slotMed = i;
+			break;
+		case eItemType::PISTOL:
+		case eItemType::SHOTGUN:
+			++countGun;
+			if (it.Value < lowestGun)
+				lowestGun = it.Value, slotGun = i;
+			break;
+		default:
+			break;
+		}
+	}
+
+	bool energyLow = m_pBB->agent.Energy < 4.f;
+	bool healthLow = m_pBB->agent.Health < 4.f;
+
+	switch (newItem.Type)
+	{
+	case eItemType::FOOD:
+		if (slotSameType != -1 && newItem.Value > lowestSameValue)
+			return slotSameType;
+		if (countFood == 0)
+		{
+			if (energyLow)
+			{
+				if (slotGun != -1)
+					return slotGun;
+				if (!healthLow && slotMed != -1)
+					return slotMed;
+			}
+		}
+		else if (slotFood != -1 && newItem.Value > lowestFood)
+			return slotFood;
+		break;
+	case eItemType::MEDKIT:
+		if (slotSameType != -1 && newItem.Value > lowestSameValue)
+			return slotSameType;
+		if (countMed == 0)
+		{
+			if (healthLow)
+			{
+				if (countFood > 0 && (!energyLow || countFood > 1))
+					return slotFood;
+				if (slotGun != -1)
+					return slotGun;
+			}
+		}
+		else if (slotMed != -1 && newItem.Value > lowestMed)
+			return slotMed;
+		break;
+	case eItemType::PISTOL:
+	case eItemType::SHOTGUN:
+		if (slotSameType != -1 && newItem.Value > lowestSameValue)
+			return slotSameType;
+		break;
+	default:
+		break;
+	}
+	return -1;
 }
 #pragma endregion
 
