@@ -37,13 +37,13 @@ void FiniteStateMachine::OnEnter()
 
 		m_pGrid->UpdateFOVGrid();
 		 
-		if (m_CrossTargets.empty())
+		if (m_RadialTargets.empty())
 		{
 			m_ExploreOrigin = m_pBB->worldInfo.Center;
-			GenerateCrossTargets();
+			GenerateRadialTargets();
 		}
 
-		m_Target = m_CrossTargets[m_CrossTargetIndex];
+		m_Target = m_RadialTargets[m_RadialTargetIndex];
 		m_FrontierWanderTimer = 0.f;
 		break;
 	}
@@ -142,10 +142,15 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	const float arriveDist = m_pGrid->GetCellSize() * 0.5f;
 	if ((m_pBB->agent.Position - m_Target).Magnitude() < arriveDist)
 	{
-		++m_CrossTargetIndex; 
-		if (m_CrossTargetIndex >= m_CrossTargets.size())
-			m_CrossTargetIndex = 0;
-		m_Target = m_CrossTargets[m_CrossTargetIndex];
+		++m_RadialTargetIndex;
+		if (m_RadialTargetIndex >= m_RadialTargets.size())
+		{
+			m_CurrentRadius -= m_RadiusDecrement;
+			if (m_CurrentRadius < m_MinRadius)
+				m_CurrentRadius = m_InitialRadius;
+			GenerateRadialTargets();
+		}
+		m_Target = m_RadialTargets[m_RadialTargetIndex];
 	}
 
 	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
@@ -155,24 +160,21 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 	EnableSprint(steering);  
 	return steering;
 }
-void FiniteStateMachine::GenerateCrossTargets()
+void FiniteStateMachine::GenerateRadialTargets()
 {
-	m_CrossTargets.clear();
+	m_RadialTargets.clear(); 
 
 	Elite::Vector2 center = m_ExploreOrigin;
-	float halfWidth = m_pBB->worldInfo.Dimensions.x * 0.25f;
-	float halfHeight = m_pBB->worldInfo.Dimensions.y * 0.25f;
+	float angleStep = Elite::ToRadians(360.f / static_cast<float>(m_NumRadialTargets));
+	for (size_t i = 0; i < m_NumRadialTargets; ++i)
+	{ 
+		float angle = angleStep * static_cast<float>(i);
+		Elite::Vector2 offset{ cosf(angle), sinf(angle) };
+		m_RadialTargets.push_back(center + offset * m_CurrentRadius);
+	}
 
-	m_CrossTargets.push_back(center + Elite::Vector2{ 0.f, halfHeight });
-	m_CrossTargets.push_back(center);
-	m_CrossTargets.push_back(center + Elite::Vector2{ halfWidth, 0.f });
-	m_CrossTargets.push_back(center);
-	m_CrossTargets.push_back(center + Elite::Vector2{ 0.f, -halfHeight });
-	m_CrossTargets.push_back(center);
-	m_CrossTargets.push_back(center + Elite::Vector2{ -halfWidth, 0.f });
-	m_CrossTargets.push_back(center);
+	m_RadialTargetIndex = 0;
 
-	m_CrossTargetIndex = 0;
 }
 #pragma endregion
 #pragma region GO_TO_HOUSE
@@ -197,23 +199,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
 	SteeringPlugin_Output steering{};
 	m_pBB->visitedHouseCenters.push_back(m_pBB->currentHouseTarget);
 	m_pBB->hasHouseTarget = false;
-	 
-	for (auto const& item : m_pBB->items)
-	{
-		if (item.Type == eItemType::GARBAGE)
-			continue;
-		bool known = false;
-		for (auto const& knownItem : m_HouseItems)
-		{
-			if ((knownItem.Location - item.Location).MagnitudeSquared() < 0.01f)
-			{
-				known = true;
-				break;
-			}
-		}
-		if (!known)
-			m_HouseItems.push_back(item);
-	}
 
 	if (!m_HouseExplorationComplete && m_CurrentHouseExploreIndex < m_HouseExploreTargets.size())
 	{

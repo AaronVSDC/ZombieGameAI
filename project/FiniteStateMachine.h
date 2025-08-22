@@ -40,9 +40,14 @@ class FiniteStateMachine
 	// EXPLORE STATE
 	//---------------------------------
 	Elite::Vector2 m_ExploreOrigin{};
-	std::vector<Elite::Vector2> m_CrossTargets{};
-	size_t m_CrossTargetIndex = 0;
-	void GenerateCrossTargets();
+	std::vector<Elite::Vector2> m_RadialTargets{};
+	size_t m_RadialTargetIndex = 0;
+	float m_InitialRadius = 80.f;
+	float m_CurrentRadius = 80.f; 
+	float m_RadiusDecrement = 20.f;
+	float m_MinRadius = 1.f;
+	size_t m_NumRadialTargets = 8;
+	void GenerateRadialTargets();
 
 	void OnEnter(); 
 	void OnExit(); 
