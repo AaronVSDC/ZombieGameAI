@@ -21,16 +21,17 @@ void Grid::UpdateFOVGrid()
 }
 
 
-void Grid::InitGrid(const Blackboard* blackboard)
+void Grid::InitGrid(const Blackboard* blackboard, const WorldInfo& worldInfo)
 {
-    m_BB = blackboard; 
-	m_Origin = m_BB->worldInfo.Center - m_BB->worldInfo.Dimensions * 0.5f;
-	m_CellSize = m_BB->agent.FOV_Range * 0.5;
-	m_Cols = static_cast<int>(m_BB->worldInfo.Dimensions.x / m_CellSize) + 1; //+1 is to round up
-	m_Rows = static_cast<int>(m_BB->worldInfo.Dimensions.y / m_CellSize) + 1;
-	m_Grid.assign(m_Rows, std::vector<int>(m_Cols, 0)); 
-	
-    m_IsInitialized = true; 
+    m_BB = blackboard;
+    m_WorldInfo = worldInfo;
+    m_Origin = m_WorldInfo.Center - m_WorldInfo.Dimensions * 0.5f;
+    m_CellSize = m_BB->agent.FOV_Range * 0.5f;
+    m_Cols = static_cast<int>(m_WorldInfo.Dimensions.x / m_CellSize) + 1; //+1 is to round up
+    m_Rows = static_cast<int>(m_WorldInfo.Dimensions.y / m_CellSize) + 1;
+    m_Grid.assign(m_Rows, std::vector<int>(m_Cols, 0));
+
+    m_IsInitialized = true;
 }
 
 void Grid::DetectFrontiers()

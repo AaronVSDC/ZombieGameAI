@@ -88,7 +88,7 @@ void FiniteStateMachine::OnEnter()
 		 
 		if (m_RadialTargets.empty())
 		{
-			m_ExploreOrigin = m_pBB->worldInfo.Center;
+			m_ExploreOrigin = m_WorldInfo.Center;
 			GenerateRadialTargets();
 		}
 
@@ -105,7 +105,7 @@ void FiniteStateMachine::OnEnter()
 	{
 		std::cout << "GoToHouse" << std::endl;
 
-		const auto& houses = m_pBB->houses;
+		const auto& houses = m_Houses;
 		auto& agentPos = m_pBB->agent.Position;
 
 		float bestDistSqr = FLT_MAX;
@@ -135,7 +135,7 @@ void FiniteStateMachine::OnEnter()
 			m_CurrentHouseExploreIndex = 0;
 			m_HouseExplorationComplete = false;
 
-			const auto& houses = m_pBB->houses;
+			const auto& houses = m_Houses;
 			float bestDistSqr = FLT_MAX;
 			HouseInfo current{};
 			for (auto const& h : houses)
@@ -148,9 +148,8 @@ void FiniteStateMachine::OnEnter()
 				}
 			}
 
-			// Record this house so we don't explore it again
-			m_pBB->currentHouseTarget = current.Center;
-			m_pBB->visitedHouseCenters.push_back(current.Center);
+			m_CurrentHouseTarget = current.Center;
+			m_VisitedHouseCenters.push_back(current.Center);
 			m_pBB->hasHouseTarget = false;
 
 			Elite::Vector2 half = current.Size * 0.5f;
@@ -272,12 +271,12 @@ void FiniteStateMachine::IncreaseRadius(float frontierRadius)
 SteeringPlugin_Output FiniteStateMachine::UpdateEvadePurgeZone(float /*dt*/)
 {
 	SteeringPlugin_Output steering{};
-	if (m_pBB->purgeZones.empty())
+	if (m_PurgeZones.empty())
 		return steering;
 
 	const TrackedPurgeZone* closest = nullptr;
 	float bestDist = FLT_MAX;
-	for (auto const& z : m_pBB->purgeZones)
+	for (auto const& z : m_PurgeZones)
 	{
 		float d = (m_pBB->agent.Position - z.info.Center).Magnitude();
 		if (d < z.info.Radius && d < bestDist)
@@ -306,9 +305,9 @@ void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
 	auto zones = m_pInterface->GetPurgeZonesInFOV();
 	for (auto const& z : zones)
 	{
-		auto it = std::find_if(m_pBB->purgeZones.begin(), m_pBB->purgeZones.end(),
+		auto it = std::find_if(m_PurgeZones.begin(), m_PurgeZones.end(),
 			[&](const TrackedPurgeZone& p) { return p.info.ZoneHash == z.ZoneHash; });
-		if (it != m_pBB->purgeZones.end())
+		if (it != m_PurgeZones.end())
 		{
 			it->info = z;
 			it->info.Radius += 8.f; //add some padding
@@ -316,14 +315,14 @@ void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
 		}
 		else
 		{
-			m_pBB->purgeZones.push_back({ z, memoryTime });
+			m_PurgeZones.push_back({ z, memoryTime });
 		}
 	}
-	for (auto it = m_pBB->purgeZones.begin(); it != m_pBB->purgeZones.end(); )
+	for (auto it = m_PurgeZones.begin(); it != m_PurgeZones.end(); )
 	{
 		it->remainingTime -= dt;
 		if (it->remainingTime <= 0.f)
-			it = m_pBB->purgeZones.erase(it);
+			it = m_PurgeZones.erase(it);
 		else
 			++it;
 	}
@@ -333,7 +332,7 @@ void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
 
 bool FiniteStateMachine::IsPointInPurgeZone(const Elite::Vector2& pos) const
 {
-	for (auto const& z : m_pBB->purgeZones)
+	for (auto const& z : m_PurgeZones)
 		if ((pos - z.info.Center).MagnitudeSquared() < z.info.Radius * z.info.Radius)
 			return true;
 	return false;
@@ -345,7 +344,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 {
 	SteeringPlugin_Output steering{};
 
-	if (IsPointInPurgeZone(m_pBB->currentHouseTarget))
+	if (IsPointInPurgeZone(m_CurrentHouseTarget))
 	{
 		m_pBB->hasHouseTarget = false;
 		return steering;
@@ -354,12 +353,14 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	const auto agentInfo = m_pInterface->Agent_GetInfo();
 
 	const Elite::Vector2 currentWaypoint =
-		m_pInterface->NavMesh_GetClosestPathPoint(m_pBB->currentHouseTarget);
+		m_pInterface->NavMesh_GetClosestPathPoint(m_CurrentHouseTarget);
 
 	Elite::Vector2 desiredDir = m_pSteeringBehaviour->Seek(agentInfo, currentWaypoint);
 	steering.LinearVelocity = desiredDir * agentInfo.MaxLinearSpeed;
 	steering.AutoOrient = true;
 	EnableSprint(steering);
+	if (m_pBB->agent.IsInHouse)
+		m_pBB->hasHouseTarget = false; 
 	return steering;
 }
 #pragma endregion
@@ -420,8 +421,8 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 	if (closest)
 	{
 		// we have a target
-		m_pBB->lastEnemy = *closest;
-		m_pBB->lastEnemyValid = true;
+		m_LastEnemy = *closest;
+		m_LastEnemyValid = true;
 
 		Elite::Vector2 toEnemy = closest->Location - m_pBB->agent.Position;
 		float desiredOrientation = atan2f(toEnemy.y, toEnemy.x);
@@ -438,16 +439,16 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 			steering.AngularVelocity = 0.f;
 
 			// shoot if we can 
-			if (m_pBB->weaponSlot >= 0 && m_pBB->weaponAmmo > 0)
+			if (m_WeaponSlot >= 0 && m_pBB->weaponAmmo > 0)
 			{
-				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_pBB->weaponSlot));
+				m_pInterface->Inventory_UseItem(static_cast<UINT>(m_WeaponSlot));
 				m_pBB->attackLatched = false;
 			}
 		}
 	}
 	else
 	{
-	   // No enemy in sight: rotate to search
+		// No enemy in sight: rotate to search
 		const float omega = m_pBB->agent.MaxAngularSpeed;
 		steering.AngularVelocity = omega;
 
@@ -456,7 +457,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateAttack(float dt)
 		if (m_SearchRotationAccumulation >= Elite::ToRadians(360.f))
 		{
 			m_pBB->attackLatched = false;
-			m_SearchRotationAccumulation = 0.f; 
+			m_SearchRotationAccumulation = 0.f;
 		}
 	}
 
@@ -490,33 +491,28 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 			float weight = 1.f / (d + 0.001f);
 			fleeDir += away * weight;
 		}
-
-		// combine influences of all enemies. When they cancel out the
-		// resulting fleeDir becomes {0,0} which causes the agent to
-		// stand still. In that case fall back to moving directly away
-		// from the closest enemy.
 		if (fleeDir.MagnitudeSquared() < 0.001f && closest)
 			fleeDir = m_pBB->agent.Position - closest->Location;
 
 		if (fleeDir.MagnitudeSquared() > 0.f)
 			fleeDir.Normalize();
-		m_pBB->lastEnemy = *closest;
-		m_pBB->lastEnemyValid = true;
+		m_LastEnemy = *closest;
+		m_LastEnemyValid = true;
 	}
 	else if (m_pBB->agent.WasBitten)
 	{
 		float angle = m_pBB->agent.Orientation;
 		Elite::Vector2 forward{ cosf(angle), sinf(angle) };
-		m_pBB->lastEnemy.Location = m_pBB->agent.Position - forward;
-		m_pBB->lastEnemy.LinearVelocity = Elite::ZeroVector2;
-		m_pBB->lastEnemyValid = true;
-		closest = &m_pBB->lastEnemy;
+		m_LastEnemy.Location = m_pBB->agent.Position - forward;
+		m_LastEnemy.LinearVelocity = Elite::ZeroVector2;
+		m_LastEnemyValid = true;
+		closest = &m_LastEnemy;
 		fleeDir = m_pSteeringBehaviour->Evade(
 			m_pBB->agent, closest->Location, closest->LinearVelocity);
 	}
-	else if (m_pBB->lastEnemyValid)
+	else if (m_LastEnemyValid)
 	{
-		closest = &m_pBB->lastEnemy;
+		closest = &m_LastEnemy;
 		fleeDir = m_pSteeringBehaviour->Evade(
 			m_pBB->agent, closest->Location, closest->LinearVelocity);
 	}
@@ -540,9 +536,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 
 	}
 	return steering;
-
-
-
 }
 #pragma endregion
 
@@ -568,7 +561,7 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 	{
 		const ItemInfo* closest = nullptr;
 		float bestDist = FLT_MAX;
-		for (auto const& i : m_pBB->items)
+		for (auto const& i : m_Items)
 		{
 			if (i.Type == eItemType::GARBAGE)
 				continue;
@@ -607,14 +600,14 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 		ItemInfo item = target;
 		if (m_pInterface->GrabItem(item))
 		{
-			if (m_pBB->inventory[slot].Type != eItemType::GARBAGE)
+			if (m_Inventory[slot].Type != eItemType::GARBAGE)
 				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(slot));
 
 			if (m_pInterface->Inventory_AddItem(static_cast<UINT>(slot), item))
 			{
-				if (slot >= 0 && slot < static_cast<int>(m_pBB->inventory.size()))
+				if (slot >= 0 && slot < static_cast<int>(m_Inventory.size()))
 				{
-					m_pBB->inventory[slot] = item;
+					m_Inventory[slot] = item;
 					m_pBB->freeSlot = -1;
 
 					if (!m_HouseItems.empty() && (m_HouseItems.front().Location - target.Location).MagnitudeSquared() < 0.01f)
@@ -636,7 +629,7 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 
 int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 {
-	const auto& inv = m_pBB->inventory;
+	const auto& inv = m_Inventory;
 	int slotSameType = -1;
 	int lowestSameValue = INT_MAX; 
 	int slotFood = -1, slotMed = -1, slotGun = -1;
@@ -736,10 +729,10 @@ SteeringPlugin_Output FiniteStateMachine::UseItem(float /*dt*/)
 	SteeringPlugin_Output steering{};
 
 	const float maxStat{ 10.f };
-	const int invCap = static_cast<int>(m_pBB->inventory.size());
+	const int invCap = static_cast<int>(m_Inventory.size());
 	for (int i = 0; i < invCap; ++i)
 	{
-		ItemInfo& item = m_pBB->inventory[i];
+		ItemInfo& item = m_Inventory[i];
 		if (item.Type == eItemType::MEDKIT)
 		{
 			float threshold = maxStat - static_cast<float>(item.Value);
@@ -774,13 +767,13 @@ void FiniteStateMachine::PopulateBlackboard()
 {
 	m_pBB->agent = m_pInterface->Agent_GetInfo();
 	m_pBB->enemies = m_pInterface->GetEnemiesInFOV();
-	m_pBB->items = m_pInterface->GetItemsInFOV();
-	m_pBB->houses = m_pInterface->GetHousesInFOV();
-	m_pBB->worldInfo = m_pInterface->World_GetInfo();
+	m_Items = m_pInterface->GetItemsInFOV();
+	m_Houses = m_pInterface->GetHousesInFOV(); 
+	m_WorldInfo = m_pInterface->World_GetInfo();
 }
 void FiniteStateMachine::InitAndUpdateGrid()
 {
-	if (!m_pGrid->IsInitialized()) m_pGrid->InitGrid(m_pBB.get());
+	if (!m_pGrid->IsInitialized()) m_pGrid->InitGrid(m_pBB.get(), m_WorldInfo);
 	if (!m_HasEnteredFirstState) OnEnter(), m_HasEnteredFirstState = true;
 	m_pGrid->UpdateFOVGrid();
 
@@ -789,37 +782,37 @@ void FiniteStateMachine::InitAndUpdateGrid()
 void FiniteStateMachine::UpdateInventoryInfo()
 {
 	m_pBB->hasWeapon = false;
-	m_pBB->weaponSlot = -1;
+	m_WeaponSlot = -1;
 	m_pBB->weaponAmmo = 0;
 	m_pBB->freeSlot = -1;
 	m_pBB->needsMedkit = false;
 	m_pBB->needsFood = false;
 
 	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
-	if (m_pBB->inventory.size() != static_cast<size_t>(invCap))
-		m_pBB->inventory.assign(invCap, ItemInfo{ eItemType::GARBAGE });
+	if (m_Inventory.size() != static_cast<size_t>(invCap))
+		m_Inventory.assign(invCap, ItemInfo{ eItemType::GARBAGE });
 
 	for (int i = 0; i < invCap; ++i)
 	{
-		if (m_pBB->inventory[i].Type != eItemType::GARBAGE)
+		if (m_Inventory[i].Type != eItemType::GARBAGE)
 		{
 			ItemInfo invItem{};
 			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
 			{
-				m_pBB->inventory[i] = invItem;
+				m_Inventory[i] = invItem;
 
 				if (invItem.Value == 0)
 				{
 					m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
-					m_pBB->inventory[i] = { eItemType::GARBAGE };
+					m_Inventory[i] = { eItemType::GARBAGE };
 				}
 
 				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
 				{
-					if (m_pBB->weaponSlot == -1)
+					if (m_WeaponSlot == -1)
 					{
 						m_pBB->hasWeapon = true;
-						m_pBB->weaponSlot = i;
+						m_WeaponSlot = i;
 						m_pBB->weaponAmmo = invItem.Value;
 					}
 				}
@@ -838,15 +831,15 @@ void FiniteStateMachine::UpdateInventoryInfo()
 			}
 			else
 			{
-				m_pBB->inventory[i] = { eItemType::GARBAGE };
+				m_Inventory[i] = { eItemType::GARBAGE };
 			}
 		}
 
-		if (m_pBB->inventory[i].Type == eItemType::GARBAGE && m_pBB->freeSlot == -1)
+		if (m_Inventory[i].Type == eItemType::GARBAGE && m_pBB->freeSlot == -1)
 			m_pBB->freeSlot = i;
 	}
 
-	bool hasNonGarbage = std::any_of(m_pBB->items.begin(), m_pBB->items.end(),
+	bool hasNonGarbage = std::any_of(m_Items.begin(), m_Items.end(),
 		[this](const ItemInfo& item) {
 			return item.Type != eItemType::GARBAGE && !IsPointInPurgeZone(item.Location);
 		});
@@ -859,13 +852,13 @@ void FiniteStateMachine::UpdateInventoryInfo()
 	bool canReplaceItem = false;
 	if (m_pBB->freeSlot < 0)
 	{
-		for (auto const& item : m_pBB->items)
+		for (auto const& item : m_Items)
 		{
 			if (item.Type == eItemType::GARBAGE || IsPointInPurgeZone(item.Location))
 				continue;
 			if (DetermineReplacementSlot(item) != -1)
 			{
-				canReplaceItem = true; 
+				canReplaceItem = true;
 				break;
 			}
 		}
@@ -892,18 +885,18 @@ void FiniteStateMachine::UpdateInventoryInfo()
 
 void FiniteStateMachine::UpdateHouseMemory()
 {
-	for (auto const& h : m_pBB->houses)
+	for (auto const& h : m_Houses)
 	{
 		bool seen = false;
-		for (auto const& known : m_pBB->knownHouseCenters)
+		for (auto const& known : m_KnownHouseCenters)
 			if ((known - h.Center).MagnitudeSquared() < 0.01f)
-			{ 
+			{
 				seen = true;
 				break;
 			}
 		if (!seen)
 		{
-			m_pBB->knownHouseCenters.push_back(h.Center);
+			m_KnownHouseCenters.push_back(h.Center);
 
 			Elite::Vector2 half = h.Size * 0.5f;
 			float margin = m_pGrid->GetCellSize() + 15.f; 
@@ -917,7 +910,7 @@ void FiniteStateMachine::UpdateHouseMemory()
 	{
 		float bestDistSqr = FLT_MAX;
 		Elite::Vector2 currentCenter{};
-		for (auto const& h : m_pBB->houses)
+		for (auto const& h : m_Houses)
 		{
 			float d = (h.Center - m_pBB->agent.Position).MagnitudeSquared();
 			if (d < bestDistSqr)
@@ -930,7 +923,7 @@ void FiniteStateMachine::UpdateHouseMemory()
 		if (bestDistSqr < FLT_MAX)
 		{
 			bool visited = false;
-			for (auto const& v : m_pBB->visitedHouseCenters)
+			for (auto const& v : m_VisitedHouseCenters)
 			{
 				if ((v - currentCenter).MagnitudeSquared() < 0.1f * 0.1f)
 				{
@@ -939,10 +932,9 @@ void FiniteStateMachine::UpdateHouseMemory()
 				}
 			}
 
-			m_pBB->inUnvisitedHouse = !visited;
 			if (!visited)
 			{
-				m_pBB->currentHouseTarget = currentCenter;
+				m_CurrentHouseTarget = currentCenter;
 				m_pBB->hasHouseTarget = true;
 			}
 			else
@@ -953,7 +945,6 @@ void FiniteStateMachine::UpdateHouseMemory()
 	}
 	else
 	{
-		m_pBB->inUnvisitedHouse = false;
 		m_IsExploringHouse = false;
 		m_HouseExploreTargets.clear();
 		m_HouseItems.clear();
@@ -962,10 +953,10 @@ void FiniteStateMachine::UpdateHouseMemory()
 
 		float bestDistSqr = FLT_MAX;
 		Elite::Vector2 bestCenter{};
-		for (auto const& center : m_pBB->knownHouseCenters)
+		for (auto const& center : m_KnownHouseCenters)
 		{
 			bool visited = false;
-			for (auto const& v : m_pBB->visitedHouseCenters)
+			for (auto const& v : m_VisitedHouseCenters)
 			{
 				if ((v - center).MagnitudeSquared() < 0.1f * 0.1f)
 				{
@@ -985,7 +976,7 @@ void FiniteStateMachine::UpdateHouseMemory()
 
 		if (bestDistSqr < FLT_MAX)
 		{
-			m_pBB->currentHouseTarget = bestCenter;
+			m_CurrentHouseTarget = bestCenter;
 			m_pBB->hasHouseTarget = true;
 		}
 		else
