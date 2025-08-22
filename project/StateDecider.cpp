@@ -31,8 +31,9 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
     if (bb->hasNonGarbage && bb->freeSlot >= 0)
         return AgentState::PickupLoot;
 
-    if (current == AgentState::ExploreHouse && bb->agent.IsInHouse)
-        return AgentState::ExploreHouse;
+    if ((current == AgentState::ExploreHouse ||
+        current == AgentState::PickupLoot) && bb->agent.IsInHouse)
+        return AgentState::ExploreHouse; 
     if (bb->agent.IsInHouse && bb->inUnvisitedHouse)
         return AgentState::ExploreHouse;
 
