@@ -48,7 +48,7 @@ void SurvivalAgentPlugin::InitGameDebugParams(GameDebugParams& params)
 	params.SpawnPurgeZonesOnMiddleClick = true;
 	params.PrintDebugMessages = false ;
 	params.ShowDebugItemNames = true;
-	params.Seed = -1; //-1 = don't set seed. Any other number = fixed seed //TIP: use Seed = int(time(nullptr)) for pure randomness
+	params.Seed = int(time(nullptr)); //-1 = don't set seed. Any other number = fixed seed //TIP: use Seed = int(time(nullptr)) for pure randomness
 }
 
 void SurvivalAgentPlugin::Update_Debug(float dt)

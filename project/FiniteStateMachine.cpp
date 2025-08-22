@@ -407,7 +407,16 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 			float weight = 1.f / (d + 0.001f);
 			fleeDir += away * weight;
 		}
-		fleeDir.Normalize();
+
+		// combine influences of all enemies. When they cancel out the
+		// resulting fleeDir becomes {0,0} which causes the agent to
+		// stand still. In that case fall back to moving directly away
+		// from the closest enemy.
+		if (fleeDir.MagnitudeSquared() < 0.001f && closest)
+			fleeDir = m_pBB->agent.Position - closest->Location;
+
+		if (fleeDir.MagnitudeSquared() > 0.f)
+			fleeDir.Normalize();
 		m_pBB->lastEnemy = *closest;
 		m_pBB->lastEnemyValid = true;
 	}
@@ -435,11 +444,16 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadeEnemy(float dt)
 		Elite::Vector2 fleeTarget = m_pBB->agent.Position + fleeDir * fleeTargetDistance;
 
 		Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(fleeTarget);
-		Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
+		Elite::Vector2 toNav = navPt - m_pBB->agent.Position;
+		Elite::Vector2 desired{};
+		if (toNav.MagnitudeSquared() < 0.001f)
+			desired = fleeDir;
+		else
+			desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 
 		steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
 		steering.AutoOrient = true;
-		EnableSprint(steering); 
+		EnableSprint(steering);
 
 	}
 	return steering;
@@ -781,43 +795,45 @@ void FiniteStateMachine::UpdateInventoryInfo()
 
 	for (int i = 0; i < invCap; ++i)
 	{
-		ItemInfo invItem{};
-
-		if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
+		if (m_pBB->inventory[i].Type != eItemType::GARBAGE)
 		{
-			m_pBB->inventory[i] = invItem;
-
-			if (invItem.Value == 0)
+			ItemInfo invItem{};
+			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
 			{
-				m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
-				m_pBB->inventory[i] = { eItemType::GARBAGE };
-			}
+				m_pBB->inventory[i] = invItem;
 
-			if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
-			{
-				if (m_pBB->weaponSlot == -1)
+				if (invItem.Value == 0)
 				{
-					m_pBB->hasWeapon = true;
-					m_pBB->weaponSlot = i;
-					m_pBB->weaponAmmo = invItem.Value;
+					m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
+					m_pBB->inventory[i] = { eItemType::GARBAGE };
+				}
+
+				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
+				{
+					if (m_pBB->weaponSlot == -1)
+					{
+						m_pBB->hasWeapon = true;
+						m_pBB->weaponSlot = i;
+						m_pBB->weaponAmmo = invItem.Value;
+					}
+				}
+				else if (invItem.Type == eItemType::MEDKIT)
+				{
+					float threshold = 10.f - static_cast<float>(invItem.Value);
+					if (m_pBB->agent.Health <= threshold)
+						m_pBB->needsMedkit = true;
+				}
+				else if (invItem.Type == eItemType::FOOD)
+				{
+					float threshold = 10.f - static_cast<float>(invItem.Value);
+					if (m_pBB->agent.Energy <= threshold)
+						m_pBB->needsFood = true;
 				}
 			}
-			else if (invItem.Type == eItemType::MEDKIT)
+			else
 			{
-				float threshold = 10.f - static_cast<float>(invItem.Value);
-				if (m_pBB->agent.Health <= threshold)
-					m_pBB->needsMedkit = true;
+				m_pBB->inventory[i] = { eItemType::GARBAGE };
 			}
-			else if (invItem.Type == eItemType::FOOD)
-			{
-				float threshold = 10.f - static_cast<float>(invItem.Value);
-				if (m_pBB->agent.Energy <= threshold)
-					m_pBB->needsFood = true;
-			}
-		}
-		else
-		{
-			m_pBB->inventory[i] = { eItemType::GARBAGE };
 		}
 
 		if (m_pBB->inventory[i].Type == eItemType::GARBAGE && m_pBB->freeSlot == -1)
@@ -833,7 +849,8 @@ void FiniteStateMachine::UpdateInventoryInfo()
 			[this](const ItemInfo& item) {
 				return item.Type != eItemType::GARBAGE && !IsPointInPurgeZone(item.Location);
 			});
-	m_pBB->hasNonGarbage = hasNonGarbage; 
+	m_pBB->hasNonGarbage = hasNonGarbage;
+
 } 
 
 void FiniteStateMachine::UpdateHouseMemory()
