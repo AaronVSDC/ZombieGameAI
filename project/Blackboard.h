@@ -32,6 +32,7 @@ struct Blackboard
     bool                  hasNonGarbage = false;
     bool                  inPurgeZone = false;
     bool                  needsMedkit = false;
-    bool                  needsFood = false; 
+    bool                  needsFood = false;
+    bool                  canReplaceItem = false;
     std::vector<TrackedPurgeZone> purgeZones;
 };

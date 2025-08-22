@@ -28,13 +28,12 @@ AgentState StateDecider::Decide(AgentState current, Blackboard* bb, float dt)
     if (bb->needsMedkit || bb->needsFood)
         return AgentState::UseItem;
 
-    if (bb->hasNonGarbage && bb->freeSlot >= 0)
+    if (bb->hasNonGarbage && (bb->freeSlot >= 0 || bb->canReplaceItem))
         return AgentState::PickupLoot;
 
     if ((current == AgentState::ExploreHouse ||
-        current == AgentState::PickupLoot) && bb->agent.IsInHouse)
-        return AgentState::ExploreHouse; 
-    if (bb->agent.IsInHouse && bb->inUnvisitedHouse)
+        current == AgentState::PickupLoot ||
+        current == AgentState::UseItem) && bb->agent.IsInHouse)
         return AgentState::ExploreHouse;
 
     if (current == AgentState::GoToHouse && bb->hasHouseTarget && !bb->agent.IsInHouse)

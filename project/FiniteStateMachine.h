@@ -42,10 +42,11 @@ class FiniteStateMachine
 	size_t m_RadialTargetIndex = 0;
 	float m_InitialRadius = 35.f;
 	float m_CurrentRadius = m_InitialRadius;
-	float m_RadiusIncrement = 100.f;
-	float m_MinRadius = 1.f; 
+	float m_RadiusIncrement = 125.f;
 	size_t m_NumRadialTargets = 16;
+	size_t m_RadiusIncreaseCount = 0; 
 	void GenerateRadialTargets();
+	void IncreaseRadius(float frontierRadius);
 	void SetNextExploreTarget();
 
 	void OnEnter(); 

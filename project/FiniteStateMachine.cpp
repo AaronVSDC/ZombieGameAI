@@ -21,6 +21,54 @@ SteeringPlugin_Output FiniteStateMachine::Update(float dt)
 	return UpdateStates(dt);
 
 }
+SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
+{
+
+
+	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get(), dt);
+	if (next != m_CurrentState)
+		OnExit(), m_CurrentState = next, OnEnter();
+
+	switch (m_CurrentState)
+	{
+	case AgentState::Explore:
+	{
+		return UpdateExplore(dt);
+	}
+	case AgentState::GoToHouse:
+	{
+		return UpdateGoToHouse(dt);
+	}
+	case AgentState::ExploreHouse:
+	{
+		return UpdateExploreHouse(dt);
+	}
+	case AgentState::Attack:
+	{
+		return UpdateAttack(dt);
+	}
+	case AgentState::EvadeEnemy:
+	{
+		return UpdateEvadeEnemy(dt);
+	}
+	case AgentState::PickupLoot:
+	{
+		return PickupLoot(dt);
+	}
+	case AgentState::EvadePurgeZone:
+	{
+		return UpdateEvadePurgeZone(dt);
+	}
+	case AgentState::UseItem:
+	{
+		return UseItem(dt);
+		break;
+	}
+	}
+	return SteeringPlugin_Output();
+
+
+}
 void FiniteStateMachine::DebugRender() const
 {
 	m_pGrid->DebugDraw(m_pInterface);
@@ -161,8 +209,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 		{
 			Elite::Vector2 frontier = m_pGrid->GetNextFrontierTarget();
 			float frontierRadius = (frontier - m_ExploreOrigin).Magnitude();
-			m_CurrentRadius = max(m_CurrentRadius + m_RadiusIncrement, frontierRadius);
-			GenerateRadialTargets();
+			IncreaseRadius(frontierRadius); 
 		}
 		SetNextExploreTarget();
 	} 
@@ -187,8 +234,7 @@ void FiniteStateMachine::SetNextExploreTarget()
 		{
 			Elite::Vector2 frontier = m_pGrid->GetNextFrontierTarget();
 			float frontierRadius = (frontier - m_ExploreOrigin).Magnitude();
-			m_CurrentRadius = max(m_CurrentRadius + m_RadiusIncrement, frontierRadius);
-			GenerateRadialTargets();
+			IncreaseRadius(frontierRadius);
 			checked = 0;
 		}
 	}
@@ -211,7 +257,17 @@ void FiniteStateMachine::GenerateRadialTargets()
 	m_RadialTargetIndex = 0;
 
 }
+void FiniteStateMachine::IncreaseRadius(float frontierRadius)
+{
+	float increment = m_RadiusIncrement;
+	if (m_RadiusIncreaseCount >= 2)
+		increment *= 0.5f;
+	m_CurrentRadius = max(m_CurrentRadius + increment, frontierRadius);
+	++m_RadiusIncreaseCount;
+	GenerateRadialTargets();
+}
 #pragma endregion
+
 #pragma region EVADE_PURGE_ZONE
 SteeringPlugin_Output FiniteStateMachine::UpdateEvadePurgeZone(float /*dt*/)
 {
@@ -243,6 +299,44 @@ SteeringPlugin_Output FiniteStateMachine::UpdateEvadePurgeZone(float /*dt*/)
 		EnableSprint(steering);
 	}
 	return steering;
+} 
+void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
+{
+	const float memoryTime = 10.f;
+	auto zones = m_pInterface->GetPurgeZonesInFOV();
+	for (auto const& z : zones)
+	{
+		auto it = std::find_if(m_pBB->purgeZones.begin(), m_pBB->purgeZones.end(),
+			[&](const TrackedPurgeZone& p) { return p.info.ZoneHash == z.ZoneHash; });
+		if (it != m_pBB->purgeZones.end())
+		{
+			it->info = z;
+			it->info.Radius += 8.f; //add some padding
+			it->remainingTime = memoryTime;
+		}
+		else
+		{
+			m_pBB->purgeZones.push_back({ z, memoryTime });
+		}
+	}
+	for (auto it = m_pBB->purgeZones.begin(); it != m_pBB->purgeZones.end(); )
+	{
+		it->remainingTime -= dt;
+		if (it->remainingTime <= 0.f)
+			it = m_pBB->purgeZones.erase(it);
+		else
+			++it;
+	}
+
+	m_pBB->inPurgeZone = IsPointInPurgeZone(m_pBB->agent.Position);
+}
+
+bool FiniteStateMachine::IsPointInPurgeZone(const Elite::Vector2& pos) const
+{
+	for (auto const& z : m_pBB->purgeZones)
+		if ((pos - z.info.Center).MagnitudeSquared() < z.info.Radius * z.info.Radius)
+			return true;
+	return false;
 }
 #pragma endregion
 
@@ -269,6 +363,7 @@ SteeringPlugin_Output FiniteStateMachine::UpdateGoToHouse(float dt)
 	return steering;
 }
 #pragma endregion
+
 #pragma region EXPLORE_HOUSE
 SteeringPlugin_Output FiniteStateMachine::UpdateExploreHouse(float dt)
 {
@@ -493,17 +588,18 @@ SteeringPlugin_Output FiniteStateMachine::PickupLoot(float dt)
 		}
 	}
 
-	if (!hasTarget)
-		return steering;
-
-	if (IsPointInPurgeZone(target.Location))
-		return steering;
+	if (!hasTarget || IsPointInPurgeZone(target.Location))
+	{
+		return m_pBB->agent.IsInHouse ? UpdateExploreHouse(dt) : UpdateExplore(dt);
+	}
 
 	int slot = m_pBB->freeSlot;
 	if (slot < 0)
 		slot = DetermineReplacementSlot(target);
 	if (slot < 0)
-		return steering;
+	{
+		return m_pBB->agent.IsInHouse ? UpdateExploreHouse(dt) : UpdateExplore(dt);
+	}
 
 	float distSqr = (target.Location - m_pBB->agent.Position).MagnitudeSquared();
 	if (distSqr < m_pBB->agent.GrabRange * m_pBB->agent.GrabRange)
@@ -673,7 +769,6 @@ SteeringPlugin_Output FiniteStateMachine::UseItem(float /*dt*/)
 }
 #pragma endregion
 
-
 #pragma region HELPER
 void FiniteStateMachine::PopulateBlackboard()
 {
@@ -689,85 +784,6 @@ void FiniteStateMachine::InitAndUpdateGrid()
 	if (!m_HasEnteredFirstState) OnEnter(), m_HasEnteredFirstState = true;
 	m_pGrid->UpdateFOVGrid();
 
-}
-SteeringPlugin_Output FiniteStateMachine::UpdateStates(float dt)
-{
-
-
-	AgentState next = m_pStateDecider->Decide(m_CurrentState, m_pBB.get(), dt);
-	if (next != m_CurrentState)
-		OnExit(), m_CurrentState = next, OnEnter();
-
-	switch (m_CurrentState)
-	{
-	case AgentState::Explore:
-	{
-		return UpdateExplore(dt);
-	}
-	case AgentState::GoToHouse:
-	{
-		return UpdateGoToHouse(dt);
-	}
-	case AgentState::ExploreHouse:
-	{
-		return UpdateExploreHouse(dt);
-	}
-	case AgentState::Attack:
-	{
-		return UpdateAttack(dt);
-	}
-	case AgentState::EvadeEnemy:
-	{
-		return UpdateEvadeEnemy(dt);
-	}
-	case AgentState::PickupLoot:
-	{
-		return PickupLoot(dt);
-	}
-	case AgentState::EvadePurgeZone:
-	{
-		return UpdateEvadePurgeZone(dt);
-	}
-	case AgentState::UseItem:
-	{
-		return UseItem(dt);
-		break;
-	}
-	}
-	return SteeringPlugin_Output();
-
-
-}
-
-void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
-{
-	const float memoryTime = 10.f;
-	auto zones = m_pInterface->GetPurgeZonesInFOV();
-	for (auto const& z : zones)
-	{
-		auto it = std::find_if(m_pBB->purgeZones.begin(), m_pBB->purgeZones.end(),
-			[&](const TrackedPurgeZone& p) { return p.info.ZoneHash == z.ZoneHash; });
-		if (it != m_pBB->purgeZones.end())
-		{
-			it->info = z;
-			it->info.Radius += 8.f; //add some padding
-			it->remainingTime = memoryTime;
-		}
-		else
-		{
-			m_pBB->purgeZones.push_back({ z, memoryTime });
-		}
-	}
-	for (auto it = m_pBB->purgeZones.begin(); it != m_pBB->purgeZones.end(); )
-	{
-		it->remainingTime -= dt;
-		if (it->remainingTime <= 0.f)
-			it = m_pBB->purgeZones.erase(it);
-		else
-			++it;
-	}
-
-	m_pBB->inPurgeZone = IsPointInPurgeZone(m_pBB->agent.Position);
 }
 
 void FiniteStateMachine::UpdateInventoryInfo()
@@ -839,7 +855,38 @@ void FiniteStateMachine::UpdateInventoryInfo()
 			[this](const ItemInfo& item) {
 				return item.Type != eItemType::GARBAGE && !IsPointInPurgeZone(item.Location);
 			});
+
+	bool canReplaceItem = false;
+	if (m_pBB->freeSlot < 0)
+	{
+		for (auto const& item : m_pBB->items)
+		{
+			if (item.Type == eItemType::GARBAGE || IsPointInPurgeZone(item.Location))
+				continue;
+			if (DetermineReplacementSlot(item) != -1)
+			{
+				canReplaceItem = true; 
+				break;
+			}
+		}
+		if (!canReplaceItem && m_HouseExplorationComplete)
+		{
+			for (auto const& item : m_HouseItems)
+			{
+				if (item.Type == eItemType::GARBAGE || IsPointInPurgeZone(item.Location))
+					continue;
+				if (DetermineReplacementSlot(item) != -1)
+				{
+					canReplaceItem = true;
+					break;
+				}
+			}
+		}
+	}
+
 	m_pBB->hasNonGarbage = hasNonGarbage;
+	m_pBB->canReplaceItem = canReplaceItem;
+
 
 } 
 
@@ -961,12 +1008,5 @@ void FiniteStateMachine::EnableSprint(SteeringPlugin_Output& steering)
 			m_WantsToRun = true;
 	}
 	steering.RunMode = m_WantsToRun;
-}
-bool FiniteStateMachine::IsPointInPurgeZone(const Elite::Vector2& pos) const
-{
-	for (auto const& z : m_pBB->purgeZones)
-		if ((pos - z.info.Center).MagnitudeSquared() < z.info.Radius * z.info.Radius)
-			return true;
-	return false;
 }
 #pragma endregion
