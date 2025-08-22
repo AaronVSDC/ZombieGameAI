@@ -176,18 +176,6 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 }
 void FiniteStateMachine::SetNextExploreTarget()
 {
-	// Prioritize local exploration targets generated around newly discovered houses
-	while (!m_ExtraExploreTargets.empty())
-	{
-		Elite::Vector2 candidate = m_ExtraExploreTargets.front();
-		m_ExtraExploreTargets.pop_front();
-		if (!m_pGrid->IsCellVisited(candidate))
-		{
-			m_Target = candidate;
-			return;
-		}
-	}
-
 	size_t checked = 0;
 	while ((m_pGrid->IsCellVisited(m_RadialTargets[m_RadialTargetIndex]) ||
 		IsPointInPurgeZone(m_RadialTargets[m_RadialTargetIndex])) &&
@@ -596,9 +584,6 @@ int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 		}
 	}
 
-	bool energyLow = m_pBB->agent.Energy < 4.f;
-	bool healthLow = m_pBB->agent.Health < 4.f;
-
 	switch (newItem.Type)
 	{
 	case eItemType::FOOD:
@@ -606,19 +591,14 @@ int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 			return slotSameType;
 		if (countFood == 0)
 		{
-			if (energyLow)
+			if (countGun >= countMed)
 			{
-				// No food while energy is low: swap out the
-				// most abundant item type to make room.
-				if (countGun >= countMed)
-				{
-					if (slotGun != -1)
-						return slotGun;
-				}
-				else if (slotMed != -1)
-				{
-					return slotMed;
-				}
+				if (slotGun != -1)
+					return slotGun;
+			}
+			else if (slotMed != -1)
+			{
+				return slotMed;
 			}
 		}
 		else if (slotFood != -1 && newItem.Value > lowestFood)
@@ -629,19 +609,14 @@ int FiniteStateMachine::DetermineReplacementSlot(const ItemInfo& newItem) const
 			return slotSameType;
 		if (countMed == 0)
 		{
-			if (healthLow)
+			if (countGun >= countFood)
 			{
-				// No medkits while health is low: remove the
-				// item type that is most common in the inventory.
-				if (countGun >= countFood)
-				{
-					if (slotGun != -1) 
-						return slotGun;
-				}
-				else if (slotFood != -1)
-				{
-					return slotFood;
-				}
+				if (slotGun != -1)
+					return slotGun;
+			}
+			else if (slotFood != -1)
+			{
+				return slotFood;
 			}
 		}
 		else if (slotMed != -1 && newItem.Value > lowestMed)
@@ -775,6 +750,7 @@ void FiniteStateMachine::UpdatePurgeZoneMemory(float dt)
 		if (it != m_pBB->purgeZones.end())
 		{
 			it->info = z;
+			it->info.Radius += 8.f; //add some padding
 			it->remainingTime = memoryTime;
 		}
 		else
@@ -886,10 +862,7 @@ void FiniteStateMachine::UpdateHouseMemory()
 			float margin = m_pGrid->GetCellSize() + 15.f; 
 			float offsetX = half.x + margin;
 			float offsetY = half.y + margin;
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, offsetY });   // top
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ offsetX, 0.f });   // right
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ 0.f, -offsetY });  // bottom
-			m_ExtraExploreTargets.push_back(h.Center + Elite::Vector2{ -offsetX, 0.f });  // left
+
 		
 		}
 	}

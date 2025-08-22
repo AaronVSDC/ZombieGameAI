@@ -19,8 +19,6 @@ class FiniteStateMachine
 	bool m_HasEnteredFirstState = false;
 
 	float m_FrontierWanderTimer = 0.f;
-	const float m_FrontierWanderDuration = 9.f;
-
 	float m_SearchRotationAccumulation = 0.f;
 
 	bool m_WantsToRun = false;
@@ -44,10 +42,9 @@ class FiniteStateMachine
 	size_t m_RadialTargetIndex = 0;
 	float m_InitialRadius = 35.f;
 	float m_CurrentRadius = m_InitialRadius;
-	float m_RadiusIncrement = 90.f;
+	float m_RadiusIncrement = 100.f;
 	float m_MinRadius = 1.f; 
 	size_t m_NumRadialTargets = 16;
-	std::deque<Elite::Vector2> m_ExtraExploreTargets{};
 	void GenerateRadialTargets();
 	void SetNextExploreTarget();
 
