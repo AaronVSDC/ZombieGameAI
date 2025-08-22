@@ -97,7 +97,19 @@ Elite::Vector2 Grid::GetNextFrontierTarget() const
 
     return *best;
 }
+bool Grid::IsCellVisited(const Elite::Vector2& pos) const
+{
+    if (!m_IsInitialized)
+        return false;
 
+    int c = static_cast<int>((pos.x - m_Origin.x) / m_CellSize);
+    int r = static_cast<int>((pos.y - m_Origin.y) / m_CellSize);
+
+    if (r < 0 || r >= m_Rows || c < 0 || c >= m_Cols)
+        return false;
+
+    return m_Grid[r][c] == 1;
+}
 void Grid::DebugDraw(IExamInterface* m_pInterface) const
 {
     // Depths

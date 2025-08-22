@@ -17,6 +17,8 @@ public:
 	void UpdateFOVGrid(); 
 	void DebugDraw(IExamInterface* _interface) const;
 	Elite::Vector2 GetNextFrontierTarget() const;
+	 
+	bool IsCellVisited(const Elite::Vector2& pos) const;
 
 	//----------------
 	//GETTERS/SETTERS

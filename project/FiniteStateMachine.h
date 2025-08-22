@@ -43,11 +43,12 @@ class FiniteStateMachine
 	std::vector<Elite::Vector2> m_RadialTargets{};
 	size_t m_RadialTargetIndex = 0;
 	float m_InitialRadius = 10.f;
-	float m_CurrentRadius = m_InitialRadius; 
+	float m_CurrentRadius = m_InitialRadius;
 	float m_RadiusIncrement = 45.f;
 	float m_MinRadius = 1.f;
-	size_t m_NumRadialTargets = 16;
+	size_t m_NumRadialTargets = 16; 
 	void GenerateRadialTargets();
+	void SetNextExploreTarget();
 
 	void OnEnter(); 
 	void OnExit(); 

@@ -43,7 +43,7 @@ void FiniteStateMachine::OnEnter()
 			GenerateRadialTargets();
 		}
 
-		m_Target = m_RadialTargets[m_RadialTargetIndex];
+		SetNextExploreTarget();
 		m_FrontierWanderTimer = 0.f;
 		break;
 	}
@@ -145,20 +145,39 @@ SteeringPlugin_Output FiniteStateMachine::UpdateExplore(float dt)
 		++m_RadialTargetIndex;
 		if (m_RadialTargetIndex >= m_RadialTargets.size())
 		{
-			m_CurrentRadius += m_RadiusIncrement;
-			if (m_CurrentRadius < m_MinRadius)
-				m_CurrentRadius = m_InitialRadius;
+			Elite::Vector2 frontier = m_pGrid->GetNextFrontierTarget();
+			float frontierRadius = (frontier - m_ExploreOrigin).Magnitude();
+			m_CurrentRadius = max(m_CurrentRadius + m_RadiusIncrement, frontierRadius);
 			GenerateRadialTargets();
 		}
-		m_Target = m_RadialTargets[m_RadialTargetIndex];
+		SetNextExploreTarget();
 	}
 
 	Elite::Vector2 navPt = m_pInterface->NavMesh_GetClosestPathPoint(m_Target);
 	Elite::Vector2 desired = m_pSteeringBehaviour->Seek(m_pBB->agent, navPt);
 	steering.AutoOrient = true;
 	steering.LinearVelocity = desired * m_pBB->agent.MaxLinearSpeed;
-	EnableSprint(steering);  
-	return steering;
+	EnableSprint(steering);
+	return steering; 
+}
+void FiniteStateMachine::SetNextExploreTarget()
+{
+	size_t checked = 0;
+	while (m_pGrid->IsCellVisited(m_RadialTargets[m_RadialTargetIndex]) && checked < m_NumRadialTargets)
+	{
+		++m_RadialTargetIndex;
+		++checked;
+		if (m_RadialTargetIndex >= m_RadialTargets.size())
+		{
+			Elite::Vector2 frontier = m_pGrid->GetNextFrontierTarget();
+			float frontierRadius = (frontier - m_ExploreOrigin).Magnitude();
+			m_CurrentRadius = max(m_CurrentRadius + m_RadiusIncrement, frontierRadius);
+			GenerateRadialTargets();
+			checked = 0;
+		}
+	}
+
+	m_Target = m_RadialTargets[m_RadialTargetIndex];
 }
 void FiniteStateMachine::GenerateRadialTargets()
 {
