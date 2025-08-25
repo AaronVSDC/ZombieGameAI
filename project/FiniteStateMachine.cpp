@@ -93,7 +93,6 @@ void FiniteStateMachine::OnEnter()
 		}
 
 		SetNextExploreTarget();
-		m_FrontierWanderTimer = 0.f;
 		break;
 	}
 	case AgentState::EvadePurgeZone:
@@ -788,27 +787,22 @@ void FiniteStateMachine::UpdateInventoryInfo()
 	m_pBB->needsMedkit = false;
 	m_pBB->needsFood = false;
 
-	const int invCap = static_cast<int>(m_pInterface->Inventory_GetCapacity());
-	if (m_Inventory.size() != static_cast<size_t>(invCap))
+	size_t invCap = m_pInterface->Inventory_GetCapacity();
+	if (m_Inventory.size() != invCap)
 		m_Inventory.assign(invCap, ItemInfo{ eItemType::GARBAGE });
 
-	for (int i = 0; i < invCap; ++i)
-	{
-		if (m_Inventory[i].Type != eItemType::GARBAGE)
-		{
+	for (size_t i = 0; i < invCap; ++i) {
+		if (m_Inventory[i].Type != eItemType::GARBAGE){
 			ItemInfo invItem{};
-			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem))
-			{
+			if (m_pInterface->Inventory_GetItem(static_cast<UINT>(i), invItem)){
 				m_Inventory[i] = invItem;
 
-				if (invItem.Value == 0)
-				{
+				if (invItem.Value == 0){
 					m_pInterface->Inventory_RemoveItem(static_cast<UINT>(i));
 					m_Inventory[i] = { eItemType::GARBAGE };
 				}
 
-				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN)
-				{
+				if (invItem.Type == eItemType::PISTOL || invItem.Type == eItemType::SHOTGUN){
 					if (m_WeaponSlot == -1)
 					{
 						m_pBB->hasWeapon = true;
@@ -816,21 +810,18 @@ void FiniteStateMachine::UpdateInventoryInfo()
 						m_pBB->weaponAmmo = invItem.Value;
 					}
 				}
-				else if (invItem.Type == eItemType::MEDKIT)
-				{
+				else if (invItem.Type == eItemType::MEDKIT){
 					float threshold = 10.f - static_cast<float>(invItem.Value);
 					if (m_pBB->agent.Health <= threshold)
 						m_pBB->needsMedkit = true;
 				}
-				else if (invItem.Type == eItemType::FOOD)
-				{
+				else if (invItem.Type == eItemType::FOOD){
 					float threshold = 10.f - static_cast<float>(invItem.Value);
 					if (m_pBB->agent.Energy <= threshold)
 						m_pBB->needsFood = true;
 				}
 			}
-			else
-			{
+			else{
 				m_Inventory[i] = { eItemType::GARBAGE };
 			}
 		}
@@ -850,37 +841,28 @@ void FiniteStateMachine::UpdateInventoryInfo()
 			});
 
 	bool canReplaceItem = false;
-	if (m_pBB->freeSlot < 0)
-	{
-		for (auto const& item : m_Items)
-		{
+	if (m_pBB->freeSlot < 0){
+		for (auto const& item : m_Items){
 			if (item.Type == eItemType::GARBAGE || IsPointInPurgeZone(item.Location))
 				continue;
-			if (DetermineReplacementSlot(item) != -1)
-			{
+			if (DetermineReplacementSlot(item) != -1){
 				canReplaceItem = true;
 				break;
 			}
 		}
-		if (!canReplaceItem && m_HouseExplorationComplete)
-		{
-			for (auto const& item : m_HouseItems)
-			{
+		if (!canReplaceItem && m_HouseExplorationComplete){
+			for (auto const& item : m_HouseItems){
 				if (item.Type == eItemType::GARBAGE || IsPointInPurgeZone(item.Location))
 					continue;
-				if (DetermineReplacementSlot(item) != -1)
-				{
+				if (DetermineReplacementSlot(item) != -1){
 					canReplaceItem = true;
 					break;
 				}
 			}
 		}
 	}
-
 	m_pBB->hasNonGarbage = hasNonGarbage;
 	m_pBB->canReplaceItem = canReplaceItem;
-
-
 } 
 
 void FiniteStateMachine::UpdateHouseMemory()
